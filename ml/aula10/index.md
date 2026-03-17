@@ -174,6 +174,8 @@ Em cada fold da CV:
 
 Isso é feito automaticamente pelo `cross_val_score`, `GridSearchCV`, `RandomizedSearchCV` etc.
 
+#### Exemplo
+
 ```python
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import cross_val_score, StratifiedKFold
@@ -207,4 +209,27 @@ O que acontece internamente nos 5 folds?
 
 Cada fold tem seu próprio scaler, sua própria seleção de features e seu próprio modelo.
 
-Ao final, a média das métricas (ex.: acurácia, ROC AUC) é uma estimativa mais confiável da performance do modelo em dados não vistos, sem o risco de data leakage.
+> Ao final, a média das métricas (ex.: acurácia, ROC AUC) é uma estimativa mais confiável da performance do modelo em dados não vistos, sem o risco de data leakage.
+
+### Ciclo
+
+``` mermaid
+graph TD
+    0@{ shape: cyl, label: "Aquisição de Dados" } --> 1[Define K-fold]
+    1 --> A@{ shape: subproc, label: "Divisão dos Dados" }
+    subgraph kfold["K-Fold"]
+        A --> B[Treinamento]:::train
+        A --> C[Teste]:::test
+        B --> D[Pré-processamento]:::train
+        D --> E[Seleção de Features]:::train    
+        E --> F[Seleção de Modelos]:::train
+        F --> CV{K-fold terminou?}
+        CV -->|Não| A
+    end
+    CV -->|Sim| G{Avaliação}
+    C --> G
+    G -->|Reavaliação| 1
+    G -->|Adequado| H@{ shape: stadium, label: "Produção" }
+    classDef train fill:#8bf
+    classDef test fill:#f88
+```
