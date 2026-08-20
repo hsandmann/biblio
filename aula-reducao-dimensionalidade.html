@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark" data-pal="std">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redução de dimensionalidade — PCA, t-SNE e UMAP</title>
+<style>
+:root{
+  /* tema escuro (padrão) */
+  --bg:#0F1317; --panel:#171D23; --panel2:#1E262E; --rule:#2B353F;
+  --tx:#D9E0E6; --tx2:#8B99A6; --tx3:#5F6D7A;
+  --cbg:#0B0E11; --cgrid:#232C34; --imghi:#F2F6F8; --onacc:#08151A;
+  --lin:#4FC7E8; --tsne:#FF74A8; --umap:#B6DE4B; --warn:#FFB454; --red:#FF6B6B;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+}
+[data-theme="light"]{
+  --bg:#F3F5F4; --panel:#FFFFFF; --panel2:#EAEEED; --rule:#D3DAD8;
+  --tx:#151B20; --tx2:#4C585F; --tx3:#7A868D;
+  --cbg:#FBFCFC; --cgrid:#DCE3E2; --imghi:#0D1317; --onacc:#FFFFFF;
+  --lin:#0E7C99; --tsne:#B8185F; --umap:#4C7A0E; --warn:#A25409; --red:#BF3A2B;
+}
+[data-theme="contrast"]{
+  --bg:#000000; --panel:#0A0A0A; --panel2:#161616; --rule:#3D3D3D;
+  --tx:#FFFFFF; --tx2:#D2D2D2; --tx3:#9C9C9C;
+  --cbg:#000000; --cgrid:#333333; --imghi:#FFFFFF; --onacc:#000000;
+  --lin:#5FDCFF; --tsne:#FF97C4; --umap:#D2F25C; --warn:#FFC96F; --red:#FF8080;
+}
+/* paletas — devem vir depois dos temas */
+[data-pal="cb"]{ --lin:#56B4E9; --tsne:#E69F00; --umap:#009E73; }
+[data-theme="light"][data-pal="cb"]{ --lin:#0072B2; --tsne:#B4600A; --umap:#00775A; }
+[data-pal="mono"]{ --lin:#E6F1F6; --tsne:#9FBDCB; --umap:#5F7E8D; }
+[data-theme="light"][data-pal="mono"]{ --lin:#14323C; --tsne:#4E7686; --umap:#6D8C9A; }
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:74px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* ---------- LINHA DO TEMPO (navegação-assinatura) ---------- */
+.timeline{position:sticky;top:0;z-index:60;background:rgba(15,19,23,.93);backdrop-filter:blur(8px);border-bottom:1px solid var(--rule)}
+.tl-in{max-width:1080px;margin:0 auto;padding:9px 20px 11px;display:flex;align-items:center;gap:14px}
+.tl-lab{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--tx3);text-transform:uppercase;white-space:nowrap}
+.tl-track{position:relative;flex:1;height:26px}
+.tl-bar{position:absolute;top:11px;left:0;right:0;height:2px;background:var(--rule)}
+.tl-fill{position:absolute;top:11px;left:0;height:2px;background:var(--lin);width:0;transition:width .2s}
+.tl-track a{position:absolute;top:0;transform:translateX(-50%);display:block;padding-top:5px;text-align:center;text-decoration:none}
+.tl-track a i{display:block;width:9px;height:9px;border-radius:50%;background:var(--panel2);border:1.5px solid var(--rule);margin:0 auto;transition:.15s}
+.tl-track a b{display:block;font-family:var(--mono);font-size:8.5px;color:var(--tx3);margin-top:3px;letter-spacing:.04em}
+.tl-track a:hover i{border-color:var(--lin);transform:scale(1.35)}
+.tl-track a.on i{background:var(--lin);border-color:var(--lin)}
+.tl-track a.on b{color:var(--tx)}
+@media(max-width:760px){.tl-lab{display:none}.tl-track a b{display:none}}
+
+.thctl{display:flex;gap:6px;align-items:center}
+.thctl select{background:var(--panel);color:var(--tx2);border:1px solid var(--rule);font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:4px 5px;border-radius:3px;cursor:pointer}
+.thctl select:hover{border-color:var(--lin);color:var(--tx)}
+@media(max-width:560px){.thctl select{font-size:9px;padding:3px 3px}}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 130px}
+.col{max-width:760px}
+
+/* ---------- CAPA ---------- */
+.capa{padding:64px 0 46px;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--tx3)}
+h1{font-size:clamp(32px,5vw,52px);line-height:1.04;letter-spacing:-.025em;margin:.45em 0 .2em;font-weight:700}
+h1 .a{color:var(--lin)} h1 .b{color:var(--tsne)} h1 .c{color:var(--umap)}
+.capa p.lede{font-size:19px;color:var(--tx2);max-width:62ch;margin:.9rem 0 0}
+.fichas{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.ficha{font-family:var(--mono);font-size:11px;color:var(--tx2);background:var(--panel);border:1px solid var(--rule);padding:6px 11px;border-radius:3px}
+
+/* ---------- SEÇÕES ---------- */
+section{padding:52px 0 0;scroll-margin-top:70px}
+.bloco-h{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:22px;flex-wrap:wrap}
+.bloco-h .t{font-family:var(--mono);font-size:11px;color:var(--warn);letter-spacing:.12em;background:rgba(255,180,84,.1);border:1px solid rgba(255,180,84,.3);padding:3px 8px;border-radius:3px;white-space:nowrap}
+h2{font-size:27px;letter-spacing:-.015em;margin:0;font-weight:650;flex:1;min-width:240px}
+h3{font-size:16.5px;font-weight:650;margin:2rem 0 .5rem;color:var(--tx)}
+h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3);margin:1.7rem 0 .5rem}
+p{margin:.75rem 0;max-width:74ch}
+ul,ol{max-width:74ch;padding-left:1.2rem}
+li{margin:.3rem 0}
+b,strong{font-weight:650;color:var(--tx)}
+code{font-family:var(--mono);font-size:.87em;background:var(--panel2);padding:.1em .38em;border-radius:3px;color:var(--lin)}
+a{color:var(--lin)}
+.mut{color:var(--tx2)}
+.hl{color:var(--warn);font-weight:650}
+a.ref{color:var(--warn);text-decoration:none;border-bottom:1px solid currentColor}
+a.ref:hover{background:var(--panel2)}
+
+.eq{font-family:var(--mono);font-size:14.5px;background:var(--panel);border-left:2px solid var(--lin);padding:13px 16px;margin:1.1rem 0;overflow-x:auto;color:var(--tx);max-width:74ch;line-height:1.75}
+.eq em{color:var(--tx2);font-style:normal;font-size:12px;display:block;margin-top:.5rem;font-family:var(--sans)}
+
+.nota{border:1px solid var(--rule);background:var(--panel);padding:13px 17px;margin:1.2rem 0;max-width:74ch;border-radius:4px}
+.nota .lb{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--tx3);display:block;margin-bottom:.45rem}
+.nota.al{border-left:2px solid var(--warn)} .nota.al .lb{color:var(--warn)}
+.nota.pr{border-left:2px solid var(--umap)} .nota.pr .lb{color:var(--umap)}
+.nota p:first-of-type{margin-top:0}.nota p:last-child{margin-bottom:0}
+
+table{width:100%;border-collapse:collapse;margin:1.2rem 0;font-size:14px}
+th{text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3);border-bottom:1px solid var(--rule);padding:7px 12px 7px 0;font-weight:400}
+td{padding:9px 12px 9px 0;border-bottom:1px solid #21292F;vertical-align:top}
+
+/* ---------- BANCADA (painel de demo) ---------- */
+.bancada{background:var(--panel);border:1px solid var(--rule);border-radius:5px;margin:1.8rem 0;overflow:hidden}
+.bc-top{display:flex;align-items:center;gap:12px;background:var(--panel2);border-bottom:1px solid var(--rule);padding:8px 14px;flex-wrap:wrap}
+.bc-id{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--lin)}
+.bc-tt{font-family:var(--mono);font-size:11px;color:var(--tx2);flex:1;min-width:150px}
+.bc-read{font-family:var(--mono);font-size:11px;color:var(--tx);white-space:nowrap}
+.bc-body{padding:14px}
+canvas{display:block;width:100%;border-radius:3px;background:var(--cbg);touch-action:none}
+.ctrl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--tx2)}
+.ctrl label{display:flex;align-items:center;gap:7px}
+.ctrl input[type=range]{width:120px;accent-color:var(--lin)}
+.ctrl select{background:var(--panel2);color:var(--tx);border:1px solid var(--rule);font-family:var(--mono);font-size:11px;padding:4px 6px;border-radius:3px}
+button{font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:var(--panel2);color:var(--tx);border:1px solid var(--rule);padding:6px 12px;border-radius:3px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--lin);color:var(--tx)}
+button.pri{background:var(--lin);color:var(--onacc);border-color:var(--lin);font-weight:600}
+button.pri:hover{filter:brightness(1.12)}
+.val{color:var(--tx);min-width:38px;display:inline-block}
+.leg{font-family:var(--mono);font-size:10.5px;color:var(--tx3);margin-top:9px;line-height:1.6}
+.leg b{color:var(--tx2);font-weight:400}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:4px}
+
+/* ---------- EXERCÍCIOS ---------- */
+.ex{border:1px solid var(--rule);border-left:2px solid var(--tsne);background:var(--panel);padding:15px 18px;margin:1.4rem 0;border-radius:4px}
+.ex .hd{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--tsne);margin-bottom:.5rem}
+.ex .hd span{color:var(--tx3);float:right;letter-spacing:.08em}
+.resp{margin-top:.9rem}
+.resp>summary{font-family:var(--mono);font-size:11px;color:var(--tx3);cursor:pointer;list-style:none;padding:5px 0;border-top:1px dashed var(--rule)}
+.resp>summary::before{content:"▸ ";color:var(--tsne)}
+.resp[open]>summary::before{content:"▾ "}
+.resp>summary:hover{color:var(--tx)}
+.resp .in{background:var(--panel2);border:1px solid var(--rule);padding:11px 14px;border-radius:3px;font-size:14.5px}
+pre{background:var(--cbg);border:1px solid var(--rule);border-radius:4px;padding:13px 15px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--tx);max-width:74ch}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+@media print{.timeline{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+
+<div class="timeline">
+  <div class="tl-in">
+    <span class="tl-lab">Aula · 120 min</span>
+    <div class="tl-track" id="tlt">
+      <div class="tl-bar"></div><div class="tl-fill" id="tlf"></div>
+      <a href="#b0" data-min="0"><i></i><b>0'</b></a>
+      <a href="#b1" data-min="10"><i></i><b>10'</b></a>
+      <a href="#b2" data-min="25"><i></i><b>25'</b></a>
+      <a href="#b3" data-min="45"><i></i><b>45'</b></a>
+      <a href="#b4" data-min="60"><i></i><b>60'</b></a>
+      <a href="#b5" data-min="72"><i></i><b>72'</b></a>
+      <a href="#b6" data-min="95"><i></i><b>95'</b></a>
+      <a href="#b7" data-min="110"><i></i><b>110'</b></a>
+      <a href="#ex" data-min="112"><i></i><b>lab</b></a>
+      <a href="#anexo" data-min="120"><i></i><b>anexo</b></a>
+    </div>
+    <div class="thctl">
+      <select id="thSel" title="Tema de cores">
+        <option value="dark">escuro</option>
+        <option value="light">claro</option>
+        <option value="contrast">alto contraste</option>
+      </select>
+      <select id="palSel" title="Paleta dos métodos">
+        <option value="std">padrão</option>
+        <option value="cb">daltônico</option>
+        <option value="mono">monocromático</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="capa">
+  <div class="col">
+    <div class="eyebrow">Aula de 2 horas · Machine Learning / Redes Neurais</div>
+    <h1>Ver em 2D o que<br>existe em <span class="a">D</span> dimensões</h1>
+    <p class="lede">Três métodos, três objetivos diferentes. <span style="color:var(--lin)">PCA</span> preserva variância global e é reversível. <span style="color:var(--tsne)">t-SNE</span> preserva vizinhança local e distorce o resto. <span style="color:var(--umap)">UMAP</span> tenta preservar as duas coisas e falha de forma diferente. Saber qual distorção cada um introduz é o conteúdo desta aula.</p>
+    <div class="fichas">
+      <span class="ficha">7 demos interativos</span>
+      <span class="ficha">6 exercícios em aula</span>
+      <span class="ficha">1 laboratório</span>
+      <span class="ficha">Pré-req.: álgebra linear, covariância</span>
+    </div>
+  </div>
+</header>
+
+<section id="b0">
+  <div class="bloco-h"><span class="t">00–10 min</span><h2>Por que reduzir dimensionalidade</h2></div>
+  <div class="col">
+    <p>Quatro motivos distintos, que exigem métodos distintos — e confundi-los é a origem de quase todo mau uso:</p>
+    <table>
+      <thead><tr><th>Objetivo</th><th>O que se exige do método</th><th>Método típico</th></tr></thead>
+      <tbody>
+        <tr><td><b>Visualizar</b></td><td>Saída em 2D/3D; fidelidade local basta</td><td>t-SNE, UMAP</td></tr>
+        <tr><td><b>Comprimir / acelerar</b></td><td>Reconstrução, transformação aplicável a dados novos</td><td>PCA</td></tr>
+        <tr><td><b>Remover ruído / colinearidade</b></td><td>Descartar direções de baixa variância</td><td>PCA, PCA truncada</td></tr>
+        <tr><td><b>Pré-processar para outro modelo</b></td><td>Método <code>fit</code>/<code>transform</code> honesto, sem vazamento</td><td>PCA (quase sempre)</td></tr>
+      </tbody>
+    </table>
+    <p>Há ainda a razão estatística: a <b class="hl">maldição da dimensionalidade</b>. Em dimensão alta, o volume se concentra perto da casca da esfera e as distâncias entre pares de pontos se tornam quase todas iguais. Qualquer método baseado em distância — kNN, k-means, RBF, e os próprios t-SNE e UMAP — perde poder discriminativo.</p>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 01</span><span class="bc-tt">concentração de distâncias · n = 400 pontos uniformes em [0,1]^d</span><span class="bc-read" id="r1">d = 2</span></div>
+    <div class="bc-body">
+      <canvas id="c1" height="220"></canvas>
+      <div class="ctrl">
+        <label>dimensão d <input type="range" id="s1" min="1" max="256" value="2"><span class="val" id="v1">2</span></label>
+        <button id="b1a">animar 2 → 256</button>
+      </div>
+      <div class="leg">Histograma das distâncias euclidianas par a par, normalizadas pela média. <b>Contraste relativo = (d<sub>max</sub> − d<sub>min</sub>)/d<sub>min</sub></b> — quando tende a zero, "vizinho mais próximo" deixa de significar algo.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="nota al"><span class="lb">Consequência prática</span>
+      <p>Em d = 2 o ponto mais distante costuma estar 30–50× mais longe que o mais próximo. Em d = 256, essa razão cai para menos de 1,5. É por isso que t-SNE e UMAP <b>recomendam PCA antes</b> quando a entrada tem centenas ou milhares de dimensões: não é só velocidade, é qualidade das vizinhanças que alimentam o método.</p>
+      <p style="margin-bottom:0">Essa afirmação comprime quatro fenômenos distintos, e apenas um deles depende da distribuição dos dados. O <a class="ref" href="#anexo">anexo ao final</a> desmonta os quatro em simulações separadas — vale como leitura complementar ou como material de reposição.</p>
+    </div>
+  </div>
+</section>
+<section id="b1">
+  <div class="bloco-h"><span class="t">10–25 min</span><h2>PCA: duas derivações, um mesmo resultado</h2></div>
+  <div class="col">
+    <p>Dados centralizados <code>X ∈ ℝ^(n×d)</code>, com <code>μ = 0</code>. Procuramos uma direção unitária <code>w</code> que resuma bem os dados. Há duas formas de dizer "bem", e a beleza do PCA é que elas coincidem.</p>
+
+    <h4>Formulação 1 — máxima variância</h4>
+    <div class="eq">maximizar&nbsp; Var(Xw) = wᵀ Σ w &nbsp;&nbsp;sujeito a&nbsp; ‖w‖ = 1,&nbsp; Σ = (1/n) XᵀX
+      <em>Lagrangiano: wᵀΣw − λ(wᵀw − 1). Derivando: Σw = λw. Ou seja, w é autovetor de Σ e a variância na direção w é exatamente o autovalor λ.</em></div>
+
+    <h4>Formulação 2 — mínimo erro de reconstrução</h4>
+    <div class="eq">minimizar&nbsp; Σᵢ ‖xᵢ − (wᵀxᵢ) w‖²
+      <em>Pitágoras: ‖xᵢ‖² = (wᵀxᵢ)² + ‖resíduo‖². Como Σᵢ‖xᵢ‖² é constante, minimizar o resíduo é maximizar a projeção.</em></div>
+
+    <p>A segunda componente é o autovetor de segundo maior autovalor, necessariamente <b>ortogonal</b> ao primeiro (Σ é simétrica). Empilhando os <code>k</code> primeiros em <code>W ∈ ℝ^(d×k)</code>: projeção <code>Z = XW</code>, reconstrução <code>X̂ = ZWᵀ + μ</code>.</p>
+
+    <div class="nota"><span class="lb">Na prática: SVD, não a matriz de covariância</span>
+      <p>Bibliotecas não formam <code>Σ</code>. Fazem <code>X = UΣ_sVᵀ</code>; as colunas de <code>V</code> são as componentes e <code>λⱼ = s_j²/n</code>. Motivo: formar <code>XᵀX</code> eleva o número de condição ao quadrado, degradando a precisão. É a mesma razão pela qual não se resolve mínimos quadrados pela equação normal.</p>
+    </div>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 02</span><span class="bc-tt">arraste a linha · projeção vs. resíduo</span><span class="bc-read" id="r2">θ = 0°</span></div>
+    <div class="bc-body">
+      <canvas id="c2" height="360"></canvas>
+      <div class="ctrl">
+        <label>direção θ <input type="range" id="s2" min="0" max="179" value="15"><span class="val" id="v2">15°</span></label>
+        <button id="b2a" class="pri">encontrar PC1</button>
+        <button id="b2b">novo conjunto</button>
+        <label><input type="checkbox" id="k2" checked> mostrar resíduos</label>
+      </div>
+      <div class="leg"><span class="dot" style="background:var(--lin)"></span><b>variância projetada</b> (o que o PCA maximiza) &nbsp;·&nbsp; <span class="dot" style="background:#FF6B6B"></span><b>erro de reconstrução</b> (o que o PCA minimiza). A soma das duas barras é constante — é o teorema de Pitágoras aplicado a todo o conjunto.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="ex">
+      <div class="hd">Exercício 1 — em aula <span>6 min</span></div>
+      <p>Sem usar o computador, com os pontos <code>(2,1) (3,3) (4,3) (5,5)</code>:</p>
+      <ol><li>Centralize os dados.</li><li>Escreva a matriz de covariância 2×2 (use divisor <code>n</code>).</li><li>Obtenha os autovalores e diga qual fração da variância a primeira componente explica.</li></ol>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p>Média <code>(3,5 , 3)</code>. Centralizados: <code>(−1,5,−2) (−0,5,0) (0,5,0) (1,5,2)</code>.</p>
+        <p><code>Σ = [[1,25 , 1,50],[1,50 , 2,00]]</code>. Traço 3,25; determinante 0,25.</p>
+        <p><code>λ = (3,25 ± √(3,25² − 4·0,25))/2</code> → <code>λ₁ ≈ 3,171</code>, <code>λ₂ ≈ 0,079</code>. PC1 explica <b>≈ 97,6%</b> da variância. Autovetor de λ₁: direção ≈ <code>(0,61 , 0,79)</code>, ou seja ≈ 52°.</p>
+        <p class="mut">Note que o traço (3,25) é a variância total e é preservado: reduzir dimensão redistribui, não cria variância.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="b2">
+  <div class="bloco-h"><span class="t">25–45 min</span><h2>PCA na prática: escolher k, reconstruir, interpretar</h2></div>
+  <div class="col">
+    <p>O demo abaixo roda PCA de verdade no navegador (potenciação iterada com deflação) sobre 300 imagens sintéticas de 12×12 = <b>144 dimensões</b>. Observe três coisas: as componentes são elas próprias imagens; poucas componentes já reconstroem o essencial; e a curva de variância acumulada é o instrumento para escolher <code>k</code>.</p>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 03</span><span class="bc-tt">PCA sobre 300 imagens 12×12 · componentes, espectro e reconstrução</span><span class="bc-read" id="r3">k = 8 · 0%</span></div>
+    <div class="bc-body">
+      <canvas id="c3" height="400"></canvas>
+      <div class="ctrl">
+        <label>componentes k <input type="range" id="s3" min="1" max="40" value="8"><span class="val" id="v3">8</span></label>
+        <button id="b3a">outra amostra</button>
+      </div>
+      <div class="leg">Acima: média + primeiras 8 componentes (vermelho = peso negativo, azul = positivo). Abaixo à esquerda: espectro e variância acumulada. À direita: original × reconstrução com k componentes.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <h3>Como escolher k</h3>
+    <ul>
+      <li><b>Limiar de variância acumulada</b> — 90%, 95%, 99%. Simples e defensável; é o padrão em compressão.</li>
+      <li><b>Cotovelo do <em>scree plot</em></b> — visual e subjetivo; útil quando há estrutura clara.</li>
+      <li><b>Desempenho a jusante</b> — tratar <code>k</code> como hiperparâmetro e escolher por validação cruzada. É o único critério válido quando PCA é pré-processamento de um classificador.</li>
+      <li><b>Critério de Kaiser</b> (λ &gt; 1 sobre dados padronizados) — comum em estatística aplicada, mas frágil.</li>
+    </ul>
+
+    <div class="nota al"><span class="lb">Cinco armadilhas do PCA</span>
+      <p><b>1. Não padronizar.</b> PCA maximiza variância, e variância tem unidade. Renda em reais domina idade em anos por construção. Padronize (§ z-score) sempre que as escalas forem incomparáveis — o que equivale a fazer PCA sobre a matriz de correlação.</p>
+      <p><b>2. Ajustar antes do split.</b> <code>fit</code> no conjunto completo é vazamento: a base de projeção viu o teste. O correto é <code>fit</code> no treino e <code>transform</code> no resto — por isso PCA vive dentro de um <code>Pipeline</code>.</p>
+      <p><b>3. Supor que componentes de alta variância são as úteis para prever.</b> Não há garantia: PCA é não supervisionado e ignora <code>y</code>. Há casos clássicos em que o sinal preditivo está na última componente. Quando o objetivo é discriminar, considere LDA ou PLS.</p>
+      <p><b>4. Interpretar componentes como fatores reais.</b> O sinal e a escala são arbitrários, e a rotação dentro de um subespaço de autovalores próximos é indeterminada.</p>
+      <p><b>5. Aplicar PCA a variáveis categóricas one-hot sem pensar.</b> Funciona mecanicamente, mas a "variância" de uma indicadora é <code>p(1−p)</code> — categorias raras são automaticamente descartadas.</p>
+    </div>
+
+    <div class="ex">
+      <div class="hd">Exercício 2 — em aula <span>5 min</span></div>
+      <p>Um colega aplica PCA a 5000 atributos, mantém 50 componentes e relata acurácia de 0,94 em validação cruzada de 5 dobras. O código faz, nesta ordem: <code>StandardScaler().fit_transform(X)</code>, <code>PCA(50).fit_transform(X)</code>, <code>cross_val_score(clf, X_pca, y, cv=5)</code>. Aponte os problemas e escreva a versão correta.</p>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p>Dois vazamentos, ambos por ajuste sobre o conjunto completo: as médias/desvios do <code>StandardScaler</code> e a base de projeção do PCA foram estimadas usando as amostras que depois serviram de validação em cada dobra. A estimativa de 0,94 é otimista, e o otimismo cresce quando <code>d ≫ n</code> — exatamente o caso aqui.</p>
+        <pre><code>from sklearn.pipeline import make_pipeline
+pipe = make_pipeline(StandardScaler(), PCA(n_components=50), clf)
+scores = cross_val_score(pipe, X, y, cv=5)   # agora o fit ocorre dentro de cada dobra</code></pre>
+        <p class="mut">Bônus: <code>n_components</code> também é hiperparâmetro. Otimizá-lo olhando o mesmo <code>cross_val_score</code> reintroduz viés — use validação aninhada ou um teste reservado.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="b3">
+  <div class="bloco-h"><span class="t">45–60 min</span><h2>Onde o PCA falha: variedades não lineares</h2></div>
+  <div class="col">
+    <p>PCA só pode rotacionar e projetar — é uma transformação linear. Se os dados vivem sobre uma superfície curva mergulhada no espaço (uma <b>variedade</b>), nenhuma projeção linear a desenrola. O rocambole suíço é o contraexemplo canônico: 3D, mas intrinsecamente 2D e enrolado.</p>
+    <p>Gire a figura, veja que a estrutura é uma folha 2D, e então peça a projeção do PCA: ele acha o plano de maior variância e <b>sobrepõe voltas distintas do rolo</b>. Pontos separados por meia volta na superfície viram vizinhos no gráfico.</p>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 04</span><span class="bc-tt">rocambole suíço · distância euclidiana vs. distância geodésica</span><span class="bc-read" id="r4">rotação livre</span></div>
+    <div class="bc-body">
+      <canvas id="c4" height="330"></canvas>
+      <div class="ctrl">
+        <button id="b4a">girar</button>
+        <button id="b4b" class="pri">projetar com PCA</button>
+        <button id="b4c">desenrolar (parâmetros reais)</button>
+        <label><input type="checkbox" id="k4"> marcar par de pontos</label>
+      </div>
+      <div class="leg">Com o par marcado: <b>distância euclidiana</b> pequena (atravessando o vazio entre as camadas) mas <b>distância geodésica</b> grande (caminhando sobre a folha). Métodos de variedade usam a segunda.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <h3>O panorama dos métodos não lineares</h3>
+    <table>
+      <thead><tr><th>Método</th><th>Ideia</th><th>Estatuto hoje</th></tr></thead>
+      <tbody>
+        <tr><td>Kernel PCA</td><td>PCA no espaço de características implícito do kernel</td><td>Útil, mas exige escolher o kernel; O(n²)</td></tr>
+        <tr><td>MDS</td><td>Preservar todas as distâncias par a par</td><td>Base histórica; sofre com o <em>crowding</em></td></tr>
+        <tr><td>Isomap</td><td>MDS sobre distâncias <b>geodésicas</b> no grafo de vizinhança</td><td>Elegante; sensível a atalhos no grafo</td></tr>
+        <tr><td>LLE / Laplacian Eigenmaps</td><td>Preservar reconstruções lineares locais / autovetores do laplaciano</td><td>Ancestrais teóricos do UMAP</td></tr>
+        <tr><td><b>t-SNE</b></td><td>Casar distribuições de vizinhança</td><td>Padrão de visualização desde 2008</td></tr>
+        <tr><td><b>UMAP</b></td><td>Grafo difuso de vizinhança + layout por otimização</td><td>Padrão atual em escala</td></tr>
+        <tr><td><em>Autoencoder</em></td><td>Aprender φ e φ⁻¹ com redes</td><td>Paramétrico e reversível; ponte com deep learning</td></tr>
+      </tbody>
+    </table>
+    <div class="nota pr"><span class="lb">Fio condutor</span>
+      <p>Todos os métodos a partir do Isomap fazem a mesma aposta: <b>a distância euclidiana só é confiável localmente</b>. Constrói-se um grafo de vizinhança onde ela vale, e a geometria global é inferida a partir dele. t-SNE e UMAP diferem no que fazem <em>depois</em> de construir esse grafo.</p>
+    </div>
+  </div>
+</section>
+<section id="b4">
+  <div class="bloco-h"><span class="t">60–72 min · intervalo aos 60</span><h2>t-SNE: casar distribuições de vizinhança</h2></div>
+  <div class="col">
+    <p>A ideia em uma frase: transformar distâncias em <b>probabilidades de vizinhança</b> nos dois espaços e mover os pontos do mapa 2D até que as duas distribuições coincidam.</p>
+
+    <h4>Passo 1 — vizinhança no espaço original</h4>
+    <div class="eq">p<sub>j|i</sub> = exp(−‖xᵢ−xⱼ‖² / 2σᵢ²) / Σ<sub>k≠i</sub> exp(−‖xᵢ−x<sub>k</sub>‖² / 2σᵢ²)
+      <em>Cada ponto tem seu próprio σᵢ, ajustado por busca binária até que a perplexidade 2^H(Pᵢ) atinja o valor pedido. Perplexidade ≈ "número efetivo de vizinhos". Regiões densas ganham σ pequeno; regiões esparsas, σ grande — é uma adaptação automática de escala.</em></div>
+    <div class="eq">p<sub>ij</sub> = (p<sub>j|i</sub> + p<sub>i|j</sub>) / 2n
+      <em>Simetrização. Garante que todo ponto contribua para a perda, inclusive pontos isolados.</em></div>
+
+    <h4>Passo 2 — vizinhança no mapa, com cauda pesada</h4>
+    <div class="eq">q<sub>ij</sub> = (1 + ‖yᵢ−yⱼ‖²)⁻¹ / Σ<sub>k≠l</sub> (1 + ‖y<sub>k</sub>−y<sub>l</sub>‖²)⁻¹
+      <em>Distribuição t de Student com 1 grau de liberdade (Cauchy). É a diferença essencial em relação ao SNE original.</em></div>
+
+    <div class="nota"><span class="lb">Por que a cauda pesada — o problema do amontoamento</span>
+      <p>O volume de uma bola cresce como <code>r^d</code>. Um ponto em dimensão alta tem "espaço" para muitos vizinhos a distância moderada; em 2D esse espaço não existe. Se usássemos gaussiana nos dois lados, todos os vizinhos moderados seriam forçados ao centro e o mapa colapsaria. A cauda pesada permite que pares moderadamente distantes fiquem <b>muito</b> distantes no mapa a um custo baixo — o que libera espaço para separar os grupos. <b>Efeito colateral: as distâncias entre grupos no gráfico deixam de ser interpretáveis.</b></p>
+    </div>
+
+    <h4>Passo 3 — minimizar a divergência</h4>
+    <div class="eq">C = KL(P ‖ Q) = Σ<sub>i≠j</sub> p<sub>ij</sub> log(p<sub>ij</sub> / q<sub>ij</sub>)&nbsp;&nbsp;·&nbsp;&nbsp; ∂C/∂yᵢ = 4 Σⱼ (p<sub>ij</sub> − q<sub>ij</sub>)(1 + ‖yᵢ−yⱼ‖²)⁻¹ (yᵢ − yⱼ)
+      <em>A KL é assimétrica: p alto com q baixo custa caro (vizinhos reais separados no mapa = punido); p baixo com q alto custa pouco (pontos distantes desenhados perto = quase de graça). Daí a regra: <b>o que está junto no mapa pode não estar junto de verdade</b>.</em></div>
+
+    <p>O gradiente é uma soma de forças de mola: atração proporcional a <code>p<sub>ij</sub></code> e repulsão proporcional a <code>q<sub>ij</sub></code>. Rode o demo e observe a fase inicial de <b>exagero</b> (todos os <code>p</code> multiplicados por 12), que junta os grupos antes de deixá-los se espalhar.</p>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 05</span><span class="bc-tt">t-SNE rodando de verdade · gradiente descendente com exagero inicial</span><span class="bc-read" id="r5">iter 0 · KL —</span></div>
+    <div class="bc-body">
+      <canvas id="c5" height="330"></canvas>
+      <div class="ctrl">
+        <label>conjunto <select id="d5">
+          <option value="blobs">3 grupos iguais (10D)</option>
+          <option value="uneven">grupos de tamanhos diferentes</option>
+          <option value="roll">rocambole suíço (3D)</option>
+          <option value="noise">ruído uniforme — sem estrutura</option>
+        </select></label>
+        <label>perplexidade <input type="range" id="s5" min="2" max="80" value="30"><span class="val" id="v5">30</span></label>
+        <button id="b5a" class="pri">rodar</button>
+        <button id="b5b">reiniciar</button>
+      </div>
+      <div class="leg">Esquerda: projeção das duas primeiras dimensões originais (ou PCA). Direita: mapa t-SNE em construção. <b>Experimento obrigatório:</b> rode o conjunto "ruído uniforme" — o t-SNE produzirá grupos visualmente convincentes que não existem.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="ex">
+      <div class="hd">Exercício 3 — em aula <span>7 min</span></div>
+      <p>Rode o demo com "3 grupos iguais" nas perplexidades 2, 30 e 80. Depois rode "ruído uniforme" com perplexidade 5. Responda:</p>
+      <ol><li>O que a perplexidade baixa faz com um grupo compacto? E a alta?</li><li>Que evidência quantitativa você exigiria de um colega antes de aceitar que os grupos vistos em um t-SNE são reais?</li></ol>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p><b>1.</b> Perplexidade baixa (2–5) só enxerga pouquíssimos vizinhos: um grupo verdadeiro se fragmenta em vários subgrupos artificiais e o mapa fica "granuloso". Perplexidade alta (&gt;70) aproxima-se de uma estrutura global mais suave e pode fundir grupos genuinamente distintos. A recomendação usual, 5–50, com <code>n</code> maior tolerando valores maiores, é heurística — a prática correta é <b>rodar com várias perplexidades e só confiar no que persiste</b>.</p>
+        <p><b>2.</b> Evidências aceitáveis: (a) métrica de agrupamento calculada <b>no espaço original</b>, não no mapa (silhueta, ARI contra rótulos conhecidos); (b) estabilidade dos grupos entre sementes e perplexidades diferentes; (c) um classificador ou teste estatístico que separe os grupos usando os atributos originais; (d) se houver rótulos, coloração por rótulo. Um gráfico bonito não é evidência — é hipótese.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="b5">
+  <div class="bloco-h"><span class="t">72–95 min</span><h2>UMAP: grafo difuso e layout por atração e repulsão</h2></div>
+  <div class="col">
+    <p>UMAP chega a um resultado parecido por um caminho diferente. Em vez de distribuições sobre todos os pares, constrói explicitamente um <b>grafo de k vizinhos com pesos difusos</b> e depois o desenha.</p>
+
+    <h4>Passo 1 — grafo local com conectividade garantida</h4>
+    <div class="eq">w<sub>i→j</sub> = exp( −(d(xᵢ,xⱼ) − ρᵢ) / σᵢ ),&nbsp;&nbsp; ρᵢ = distância ao vizinho mais próximo
+      <em>σᵢ é calibrado para que Σⱼ w<sub>i→j</sub> = log₂(k). Subtrair ρᵢ garante que todo ponto tenha pelo menos uma aresta de peso 1 — nenhum ponto fica isolado, o que evita o colapso que ocorreria com densidade variável.</em></div>
+    <div class="eq">w<sub>ij</sub> = w<sub>i→j</sub> + w<sub>j→i</sub> − w<sub>i→j</sub>·w<sub>j→i</sub>
+      <em>União difusa (probabilística) das duas visões direcionadas — o análogo da simetrização do t-SNE.</em></div>
+
+    <h4>Passo 2 — desenhar o grafo</h4>
+    <div class="eq">C = Σ<sub>ij</sub> [ w<sub>ij</sub> log(w<sub>ij</sub>/v<sub>ij</sub>) + (1−w<sub>ij</sub>) log((1−w<sub>ij</sub>)/(1−v<sub>ij</sub>)) ],&nbsp; v<sub>ij</sub> = (1 + a‖yᵢ−yⱼ‖^(2b))⁻¹
+      <em>Entropia cruzada binária, não KL. O segundo termo é o que o t-SNE não tem: uma penalidade explícita por aproximar o que está longe. É a origem da preservação global um pouco melhor do UMAP.</em></div>
+
+    <p>A otimização usa <b>SGD com amostragem negativa</b>: a cada passo, uma aresta é sorteada e seus extremos se atraem; alguns pontos aleatórios são sorteados como negativos e se repelem. Isso evita a soma sobre todos os pares e é a razão do UMAP ser mais rápido — complexidade aproximada <code>O(n log n)</code> contra <code>O(n log n)</code> do t-SNE com aproximação de Barnes-Hut, mas com constante bem menor e paralelização mais simples.</p>
+  </div>
+
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">DEMO 06</span><span class="bc-tt">UMAP simplificado · grafo de k-vizinhos + SGD com amostragem negativa</span><span class="bc-read" id="r6">época 0 / 300</span></div>
+    <div class="bc-body">
+      <canvas id="c6" height="330"></canvas>
+      <div class="ctrl">
+        <label>conjunto <select id="d6">
+          <option value="blobs">3 grupos iguais (10D)</option>
+          <option value="uneven">grupos de tamanhos diferentes</option>
+          <option value="roll">rocambole suíço (3D)</option>
+          <option value="noise">ruído uniforme</option>
+        </select></label>
+        <label>n_neighbors <input type="range" id="s6" min="3" max="60" value="15"><span class="val" id="v6">15</span></label>
+        <label>min_dist <input type="range" id="s6b" min="0" max="80" value="10"><span class="val" id="v6b">0,10</span></label>
+        <button id="b6a" class="pri">rodar</button>
+        <button id="b6b">reiniciar</button>
+        <label><input type="checkbox" id="k6" checked> mostrar arestas</label>
+      </div>
+      <div class="leg">Esquerda: o grafo de vizinhança que o UMAP realmente otimiza. Direita: o layout em construção. <b>n_neighbors</b> controla o equilíbrio local↔global; <b>min_dist</b> controla apenas o quão compactos ficam os aglomerados — é estético, não estrutural.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="ex">
+      <div class="hd">Exercício 4 — em aula <span>6 min</span></div>
+      <p>No demo 06, use o rocambole suíço com <code>n_neighbors = 5</code> e depois <code>n_neighbors = 50</code>. Explique o que muda em termos do grafo construído, e diga qual dos dois desenrola melhor o rolo — e por quê.</p>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p>Com <code>n_neighbors</code> pequeno o grafo só conecta pontos muito próximos <b>sobre a folha</b>, respeitando a geodésica: o rolo desenrola bem e a estrutura local (o gradiente de cor ao longo do rolo) é preservada, mas o grafo pode fragmentar-se em componentes desconexas e a escala global fica arbitrária.</p>
+        <p>Com <code>n_neighbors</code> grande, o raio de vizinhança passa a <b>atravessar o vazio entre as camadas</b> do rolo: aparecem arestas de atalho que ligam voltas distintas, o layout sobrepõe camadas e o resultado se aproxima do que o PCA faria. Portanto <code>n_neighbors = 5</code> desenrola melhor.</p>
+        <p class="mut">Generalização: <code>n_neighbors</code> é a escala em que você declara confiar na distância euclidiana. Grande demais e a hipótese de variedade quebra.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="b6">
+  <div class="bloco-h"><span class="t">95–110 min</span><h2>Comparação e critérios de escolha</h2></div>
+  <div class="col">
+    <table>
+      <thead><tr><th></th><th style="color:var(--lin)">PCA</th><th style="color:var(--tsne)">t-SNE</th><th style="color:var(--umap)">UMAP</th></tr></thead>
+      <tbody>
+        <tr><td>Natureza</td><td>Linear, determinístico</td><td>Não linear, estocástico</td><td>Não linear, estocástico</td></tr>
+        <tr><td>Objetivo</td><td>Máxima variância</td><td>KL sobre vizinhanças</td><td>Entropia cruzada sobre grafo difuso</td></tr>
+        <tr><td>Preserva estrutura local</td><td>Fraco</td><td>Muito bom</td><td>Muito bom</td></tr>
+        <tr><td>Preserva estrutura global</td><td>Ótimo (variância)</td><td>Fraco</td><td>Moderado</td></tr>
+        <tr><td>Distância entre grupos é interpretável?</td><td>Sim</td><td><b>Não</b></td><td>Parcialmente</td></tr>
+        <tr><td>Tamanho dos grupos é interpretável?</td><td>Sim</td><td><b>Não</b></td><td><b>Não</b></td></tr>
+        <tr><td>Reconstrução (inverso)</td><td>Sim, exato no subespaço</td><td>Não</td><td>Aproximado</td></tr>
+        <tr><td>Aplicar a dados novos (<code>transform</code>)</td><td>Sim, trivial</td><td>Não (só paramétrico)</td><td>Sim</td></tr>
+        <tr><td>Custo típico</td><td><code>O(nd·k)</code>, muito rápido</td><td><code>O(n log n)</code> com Barnes-Hut, lento</td><td><code>O(n log n)</code>, rápido</td></tr>
+        <tr><td>Hiperparâmetros críticos</td><td><code>k</code>, padronização</td><td>perplexidade, iterações, <em>lr</em></td><td><code>n_neighbors</code>, <code>min_dist</code></td></tr>
+        <tr><td>Uso como pré-processamento</td><td><b>Recomendado</b></td><td>Desaconselhado</td><td>Com cautela e dentro do <em>pipeline</em></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Regra de decisão</h3>
+    <ul>
+      <li>Vai <b>alimentar outro modelo</b> ou precisa de reversibilidade → <b>PCA</b>. Ponto final.</li>
+      <li>Vai <b>olhar</b> os dados para gerar hipóteses, com <code>n</code> até ~5 mil → <b>t-SNE</b> ou UMAP, sempre com PCA antes se <code>d</code> for grande.</li>
+      <li><code>n</code> grande, ou precisa projetar dados novos no mesmo mapa → <b>UMAP</b>.</li>
+      <li>Quer estrutura global confiável em um gráfico → nenhum dos três é ideal; combine PCA (para a geometria) com t-SNE/UMAP (para os detalhes) e relate os dois.</li>
+    </ul>
+
+    <div class="nota al"><span class="lb">As sete afirmações proibidas sobre um gráfico t-SNE/UMAP</span>
+      <ol style="margin:.3rem 0">
+        <li>"Este grupo é maior, logo tem mais variabilidade." — O tamanho no mapa é artefato da densidade local.</li>
+        <li>"Estes dois grupos estão próximos, logo são parecidos." — Distâncias entre grupos não são preservadas.</li>
+        <li>"Há 5 grupos nos dados." — Há 5 manchas no gráfico; agrupamento se valida no espaço original.</li>
+        <li>"O eixo horizontal representa X." — Os eixos não têm significado; rotação e reflexão são arbitrárias.</li>
+        <li>"Rodei uma vez e vi isso." — Resultados variam com a semente; reporte várias execuções.</li>
+        <li>"Usei os 2 componentes t-SNE como atributos do meu classificador." — Não há <code>transform</code> honesto para dados novos; e você comprimiu 500 dimensões em 2 escolhidas para agradar aos olhos.</li>
+        <li>"Rodei t-SNE em todo o conjunto e depois dividi treino/teste." — Vazamento: o mapa foi construído usando o teste.</li>
+      </ol>
+    </div>
+
+    <div class="ex">
+      <div class="hd">Exercício 5 — em aula <span>5 min</span></div>
+      <p>Para cada situação, escolha o método e justifique em uma frase:</p>
+      <ol>
+        <li>Comprimir 1024 atributos de sensores para acelerar um modelo em produção que roda 50 mil vezes por segundo.</li>
+        <li>Explorar 8 mil células de RNA-seq com 20 mil genes para procurar tipos celulares desconhecidos.</li>
+        <li>Diagnosticar por que um classificador confunde duas classes, usando as ativações da penúltima camada de uma CNN.</li>
+        <li>Construir um mapa de produtos que precisa acomodar itens novos diariamente, sem recalcular tudo.</li>
+      </ol>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p><b>1. PCA.</b> Precisa de <code>transform</code> barato e determinístico em inferência; a projeção é uma única multiplicação de matriz.</p>
+        <p><b>2. PCA (50 comp.) → UMAP.</b> Escala grande e busca por estrutura desconhecida; o PCA inicial reduz ruído e custo, o UMAP dá o mapa. Validar os grupos encontrados com marcadores conhecidos, não com o gráfico.</p>
+        <p><b>3. t-SNE ou UMAP</b> colorido pelas classes e pelo acerto/erro. Objetivo é diagnóstico visual local, exatamente onde esses métodos são fortes; nada será usado a jusante.</p>
+        <p><b>4. UMAP</b> — tem <code>transform</code> para pontos novos, ao contrário do t-SNE. Alternativa: <em>autoencoder</em>, se for aceitável treinar uma rede.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="b7">
+  <div class="bloco-h"><span class="t">110–120 min</span><h2>Fechamento: como avaliar uma redução</h2></div>
+  <div class="col">
+    <p>Um gráfico não é resultado. Se a redução vai sustentar uma afirmação, ela precisa de métrica. As três mais usadas:</p>
+    <ul>
+      <li><b>Erro de reconstrução</b> — só faz sentido para métodos reversíveis (PCA, <em>autoencoder</em>). Mede o que foi perdido.</li>
+      <li><b>Confiabilidade e continuidade</b> (<em>trustworthiness</em>) — mede quantos vizinhos no mapa eram de fato vizinhos no espaço original, e vice-versa. Aplicável a qualquer método, inclusive t-SNE e UMAP. Disponível em <code>sklearn.manifold.trustworthiness</code>.</li>
+      <li><b>Desempenho a jusante</b> — acurácia de um kNN treinado no espaço reduzido comparada à do espaço original. É o teste mais honesto quando a redução é pré-processamento.</li>
+    </ul>
+    <div class="nota pr"><span class="lb">Três frases para levar da aula</span>
+      <p><b>1.</b> PCA responde "quais direções concentram variância" — pergunta global, resposta linear, reversível.</p>
+      <p><b>2.</b> t-SNE e UMAP respondem "quem está perto de quem" — pergunta local, resposta que sacrifica deliberadamente a geometria global.</p>
+      <p><b>3.</b> Todo método de redução <b>tem</b> de perder informação. A competência profissional consiste em saber exatamente qual, e em não afirmar nada que dependa da parte perdida.</p>
+    </div>
+  </div>
+</section>
+<section id="ex">
+  <div class="bloco-h"><span class="t">Laboratório</span><h2>Exercícios para entrega</h2></div>
+  <div class="col">
+    <p>Um único <em>notebook</em>, conjunto <code>load_digits()</code> do scikit-learn (1797 imagens 8×8, 64 dimensões, 10 classes) — pequeno o bastante para rodar em qualquer máquina e grande o bastante para os efeitos aparecerem. Quem preferir pode usar 10 mil amostras do Fashion-MNIST.</p>
+
+    <div class="ex">
+      <div class="hd">L1 — PCA e escolha de k <span>peso 25</span></div>
+      <ol>
+        <li>Padronize e ajuste PCA. Trace o <em>scree plot</em> e a variância acumulada. Reporte <code>k</code> para 90% e 95%.</li>
+        <li>Visualize as 10 primeiras componentes como imagens 8×8 e comente o que cada uma captura.</li>
+        <li>Reconstrua 5 dígitos com <code>k ∈ {1, 5, 10, 20, 40, 64}</code> e trace o erro médio de reconstrução em função de <code>k</code>. Verifique numericamente que esse erro é igual à soma dos autovalores descartados.</li>
+      </ol>
+    </div>
+
+    <div class="ex">
+      <div class="hd">L2 — Efeito da padronização <span>peso 10</span></div>
+      <p>Repita o item L1.1 <b>sem</b> padronizar e compare as curvas. Depois, multiplique artificialmente uma única coluna por 1000 e refaça. Explique o que aconteceu com a primeira componente e por quê.</p>
+    </div>
+
+    <div class="ex">
+      <div class="hd">L3 — t-SNE e sensibilidade a hiperparâmetros <span>peso 20</span></div>
+      <ol>
+        <li>Aplique PCA para 30 componentes e então t-SNE com perplexidades <code>{5, 30, 50}</code> e duas sementes cada — seis gráficos em uma grade, coloridos por classe.</li>
+        <li>Escolha duas classes que aparecem próximas em um dos gráficos e distantes em outro. Calcule a distância entre os centróides <b>no espaço original de 64 dimensões</b> e diga qual gráfico "acertou".</li>
+        <li>Meça o tempo de execução de cada configuração.</li>
+      </ol>
+    </div>
+
+    <div class="ex">
+      <div class="hd">L4 — UMAP e projeção de dados novos <span>peso 20</span></div>
+      <ol>
+        <li>Separe 20% das amostras. Ajuste UMAP <b>somente no treino</b> e depois use <code>.transform()</code> nos 20% restantes. Plote os dois conjuntos com marcadores diferentes.</li>
+        <li>Varie <code>n_neighbors ∈ {5, 15, 50}</code> e <code>min_dist ∈ {0.0, 0.5}</code>. Descreva, em duas frases, o papel de cada parâmetro com base no que você observou.</li>
+        <li>Explique por que o item 1 é impossível com t-SNE clássico.</li>
+      </ol>
+    </div>
+
+    <div class="ex">
+      <div class="hd">L5 — Avaliação quantitativa <span>peso 25</span></div>
+      <p>Aqui o gráfico deixa de ser o resultado.</p>
+      <ol>
+        <li>Calcule <code>trustworthiness</code> (k = 12) para: PCA-2D, t-SNE-2D e UMAP-2D. Compare.</li>
+        <li>Treine um kNN (k = 5) em quatro espaços — original de 64D, PCA-2D, PCA-20D e UMAP-2D — usando validação cruzada de 5 dobras <b>com a redução dentro do <code>Pipeline</code></b>. Compare acurácias e tempos.</li>
+        <li>Uma das quatro configurações do item anterior não pode ser colocada honestamente dentro de um <code>Pipeline</code> com validação cruzada. Identifique qual, explique o problema e proponha a alternativa correta.</li>
+      </ol>
+      <details class="resp"><summary>Dica para o item 3</summary><div class="in">
+        <p>Pense em qual método não possui <code>transform</code> aplicável a amostras que não participaram do ajuste — e no que aconteceria se você ajustasse a redução usando também as amostras da dobra de validação.</p>
+      </div></details>
+    </div>
+
+    <h3>Rubrica</h3>
+    <table>
+      <thead><tr><th>Critério</th><th>Peso</th><th>O que caracteriza nota máxima</th></tr></thead>
+      <tbody>
+        <tr><td>Correção técnica</td><td>40%</td><td>Sem vazamento; reduções dentro do <code>Pipeline</code>; métricas calculadas no espaço certo</td></tr>
+        <tr><td>Interpretação</td><td>30%</td><td>Afirmações sustentadas por números, não por aparência do gráfico; nenhuma das "sete afirmações proibidas"</td></tr>
+        <tr><td>Rigor experimental</td><td>20%</td><td>Sementes fixadas e reportadas; variabilidade entre execuções discutida; tempos medidos</td></tr>
+        <tr><td>Comunicação</td><td>10%</td><td>Figuras legendadas com eixos e parâmetros; conclusões em texto, não apenas células de código</td></tr>
+      </tbody>
+    </table>
+
+    <div class="nota al"><span class="lb">Critério eliminatório</span>
+      <p>Qualquer conclusão sobre número, tamanho ou proximidade de grupos apoiada exclusivamente em um gráfico t-SNE ou UMAP zera o critério de interpretação. Foi o tema central da aula.</p>
+    </div>
+
+    <h3>Esqueleto de código</h3>
+    <pre><code>import numpy as np, time
+from sklearn.datasets import load_digits
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE, trustworthiness
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import cross_val_score
+import umap   # pip install umap-learn
+
+SEED = 42
+X, y = load_digits(return_X_y=True)
+
+# --- L1: PCA -------------------------------------------------------------
+pca = PCA().fit(StandardScaler().fit_transform(X))
+var_acum = np.cumsum(pca.explained_variance_ratio_)
+k90 = np.searchsorted(var_acum, 0.90) + 1
+
+# --- L3: t-SNE sempre depois de uma PCA ----------------------------------
+X30 = PCA(n_components=30, random_state=SEED).fit_transform(X)
+Z_tsne = TSNE(n_components=2, perplexity=30, init="pca",
+              random_state=SEED).fit_transform(X30)
+
+# --- L4: UMAP com transform em dados novos -------------------------------
+red = umap.UMAP(n_neighbors=15, min_dist=0.1, random_state=SEED).fit(X_tr)
+Z_te = red.transform(X_te)
+
+# --- L5: avaliação honesta ----------------------------------------------
+print(trustworthiness(X, Z_tsne, n_neighbors=12))
+pipe = make_pipeline(StandardScaler(), PCA(n_components=20),
+                     KNeighborsClassifier(n_neighbors=5))
+print(cross_val_score(pipe, X, y, cv=5).mean())</code></pre>
+  </div>
+</section>
+
+<section id="anexo">
+  <div class="bloco-h"><span class="t">Material complementar</span><h2>A maldição da dimensionalidade, desmontada em quatro peças</h2></div>
+  <div class="col">
+    <p>A frase do bloco 00 costuma ser dita de um fôlego só, mas contém quatro afirmações independentes — e uma quinta, implícita e falsa, que precisa ser desarmada para o aluno não sair com a conclusão errada. Este anexo separa as quatro e simula cada uma.</p>
+  </div>
+
+  <h3>A1 · O volume foge para a casca</h3>
+  <div class="col">
+    <p>Afirmação: em dimensão alta, quase todo o volume de uma bola está numa casca fina junto à superfície.</p>
+    <div class="eq">V<sub>d</sub>(r) ∝ r<sup>d</sup> &nbsp;⟹&nbsp; P(R &gt; 1−ε) = 1 − (1−ε)<sup>d</sup>
+      <em>Para pontos uniformes na bola unitária. O raio mediano é (1/2)<sup>1/d</sup> — em d = 100, vale 0,993.</em></div>
+  </div>
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">ANEXO A1</span><span class="bc-tt">4 000 pontos uniformes na bola unitária de dimensão d</span><span class="bc-read" id="xr1">d = 3</span></div>
+    <div class="bc-body"><canvas id="xc1" height="250"></canvas>
+      <div class="ctrl">
+        <label>dimensão d <input type="range" id="xs1" min="1" max="120" value="3"><span class="val" id="xv1">3</span></label>
+        <label>espessura ε <input type="range" id="xe1" min="1" max="40" value="10"><span class="val" id="xve1">0,10</span></label>
+      </div>
+      <div class="leg">Esquerda: histograma dos raios amostrados. Direita: curva analítica da fração de volume na casca externa de espessura ε.</div>
+    </div>
+  </div>
+  <div class="col"><p>Consequência pouco intuitiva: <b>o centro fica vazio</b>. A noção de "ponto típico próximo do centroide", que sustenta boa parte da intuição de baixa dimensão, deixa de valer. Em d = 50, praticamente nenhum ponto está a menos de 90% do raio.</p></div>
+
+  <h3>A2 · A bola some dentro do cubo</h3>
+  <div class="col">
+    <div class="eq">V<sub>bola</sub>/V<sub>cubo</sub> = π<sup>d/2</sup> / (2<sup>d</sup> Γ(d/2 + 1))
+      <em>d = 2: 0,785 · d = 5: 0,164 · d = 10: 0,0025 · d = 20: 2,5×10⁻⁸. O cubo tem 2<sup>d</sup> cantos, e é neles que o volume se acumula.</em></div>
+  </div>
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">ANEXO A2</span><span class="bc-tt">fração de pontos uniformes no cubo que caem na bola inscrita</span><span class="bc-read" id="xr2">d = 2</span></div>
+    <div class="bc-body"><canvas id="xc2" height="240"></canvas>
+      <div class="ctrl"><label>dimensão d <input type="range" id="xs2" min="1" max="24" value="2"><span class="val" id="xv2">2</span></label></div>
+      <div class="leg">Curva analítica (linha) e verificação por Monte Carlo com 20 000 amostras (pontos). Escala vertical logarítmica.</div>
+    </div>
+  </div>
+  <div class="col"><p>Por que importa: se você normaliza dados dentro de um hipercubo — o que o <code>MinMaxScaler</code> faz — a região "central" que a intuição imagina como típica é, em dimensão alta, estatisticamente inatingível. Todo ponto é um caso extremo em alguma coordenada.</p></div>
+
+  <h3>A3 · As distâncias se concentram</h3>
+  <div class="col">
+    <p>Este é o fenômeno que de fato afeta kNN, k-means, RBF, t-SNE e UMAP — e o único cuja validade <b>depende da distribuição dos dados</b>.</p>
+    <div class="eq">Para coordenadas i.i.d.: E‖x−y‖ ≈ √(2dσ²) &nbsp;·&nbsp; DP(‖x−y‖) = O(1)
+      <em>A distância típica cresce como √d, mas a dispersão em torno dela não cresce. O contraste relativo (d<sub>max</sub>−d<sub>min</sub>)/d<sub>min</sub> decai como O(1/√d) — Beyer et al. (1999).</em></div>
+  </div>
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">ANEXO A3</span><span class="bc-tt">contraste de distâncias sob cinco geradores diferentes</span><span class="bc-read" id="xr3">—</span></div>
+    <div class="bc-body"><canvas id="xc3" height="300"></canvas>
+      <div class="ctrl">
+        <label>gerador <select id="xg3">
+          <option value="unif">uniforme i.i.d. — sem estrutura</option>
+          <option value="gauss">gaussiano i.i.d. — sem estrutura</option>
+          <option value="noise">3 grupos + dimensões de RUÍDO</option>
+          <option value="signal">3 grupos com SINAL em todas as dimensões</option>
+          <option value="manifold">variedade 2D girada em d dimensões</option>
+        </select></label>
+        <label>dimensão d <input type="range" id="xs3" min="2" max="256" value="2"><span class="val" id="xv3">2</span></label>
+      </div>
+      <div class="leg">Esquerda: histograma das distâncias par a par normalizadas pela média. Direita: contraste relativo em função de d, em escala log-log, com a referência teórica 1/√d tracejada. <b>Compare os cinco geradores</b> — dois colapsam, três não.</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="nota al"><span class="lb">O ponto que a frase original esconde</span>
+      <p>A concentração de distâncias <b>não é uma propriedade da dimensão</b>. É uma propriedade de distribuições cujas coordenadas são independentes e todas igualmente irrelevantes. Se as dimensões adicionais carregam sinal, ou se os dados vivem sobre uma variedade de dimensão intrínseca baixa, o contraste sobrevive — como os geradores 4 e 5 mostram.</p>
+      <p>É por isso que o kNN funciona razoavelmente bem em MNIST com 784 dimensões: a dimensão intrínseca dos dígitos manuscritos está estimada em torno de 12 a 15, não 784.</p>
+    </div>
+  </div>
+
+  <h3>A4 · Tudo fica ortogonal</h3>
+  <div class="col">
+    <div class="eq">cos θ = ⟨x,y⟩/(‖x‖‖y‖) &nbsp;~&nbsp; aproximadamente N(0, 1/d)
+      <em>O desvio-padrão do cosseno é 1/√d. Em d = 1000, 99% dos pares têm |cos θ| &lt; 0,082.</em></div>
+  </div>
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">ANEXO A4</span><span class="bc-tt">similaridade de cosseno entre 30 000 pares gaussianos aleatórios</span><span class="bc-read" id="xr4">d = 2</span></div>
+    <div class="bc-body"><canvas id="xc4" height="230"></canvas>
+      <div class="ctrl"><label>dimensão d <input type="range" id="xs4" min="2" max="500" value="2"><span class="val" id="xv4">2</span></label></div>
+      <div class="leg">Histograma medido (barras) contra a densidade N(0, 1/d) prevista (linha).</div>
+    </div>
+  </div>
+  <div class="col"><p>Tem um lado bom, raramente mencionado: é o que faz funcionar o <b>lema de Johnson–Lindenstrauss</b> — uma projeção aleatória em <code>O(log n / ε²)</code> dimensões preserva todas as distâncias par a par com erro relativo ε, <em>independentemente</em> da dimensão original. Também é o que permite que <em>embeddings</em> de dimensão modesta acomodem um número enorme de conceitos quase mutuamente ortogonais.</p></div>
+
+  <h3>A5 · A consequência prática</h3>
+  <div class="col"><p>O sinal está sempre nas duas primeiras dimensões; acrescentamos dimensões extras de três tipos e medimos a acurácia real de um 5-NN.</p></div>
+  <div class="bancada">
+    <div class="bc-top"><span class="bc-id">ANEXO A5</span><span class="bc-tt">acurácia de 5-NN · 250 treino / 250 teste · duas classes</span><span class="bc-read" id="xr5">role até aqui</span></div>
+    <div class="bc-body"><canvas id="xc5" height="280"></canvas>
+      <div class="leg"><b style="color:var(--red)">■ dimensões de ruído</b> — a acurácia despenca.&nbsp; <b style="color:var(--umap)">■ dimensões informativas</b> — a acurácia sobe.&nbsp; <b style="color:var(--lin)">■ cópias ruidosas do mesmo sinal</b> (dimensão intrínseca 2) — mantém-se.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <table>
+      <thead><tr><th>Fenômeno</th><th>Depende da distribuição?</th><th>Efeito em ML</th></tr></thead>
+      <tbody>
+        <tr><td>Volume na casca</td><td>Não — geometria pura</td><td>Intuição sobre "ponto típico" e centroides deixa de valer</td></tr>
+        <tr><td>Bola/cubo → 0</td><td>Não</td><td>Amostragem em grade é inviável; busca em grade de hiperparâmetros sofre do mesmo mal</td></tr>
+        <tr><td>Concentração de distâncias</td><td><b>Sim</b> — só com coordenadas i.i.d. irrelevantes</td><td>kNN, k-means, RBF, t-SNE e UMAP perdem discriminação</td></tr>
+        <tr><td>Quase-ortogonalidade</td><td>Parcialmente</td><td>Ruim para distâncias; <b>bom</b> para projeções aleatórias e <em>embeddings</em></td></tr>
+      </tbody>
+    </table>
+
+    <div class="nota pr"><span class="lb">Como enunciar corretamente</span>
+      <p>Não é "dimensão alta quebra métodos de distância". É: <b>dimensões que não carregam informação sobre a tarefa diluem a informação das que carregam</b>, porque cada uma acrescenta ruído aditivo à distância enquanto o sinal permanece constante. A razão sinal/ruído da distância decai como 1/√m, com m = número de dimensões irrelevantes.</p>
+      <p>Daí as três respostas corretas, todas presentes na aula: selecionar atributos, reduzir dimensionalidade preservando o sinal (PCA antes de t-SNE/UMAP), ou aprender uma métrica que pondere as dimensões — que é, no fundo, o que a primeira camada de uma rede faz.</p>
+    </div>
+
+    <div class="ex">
+      <div class="hd">Exercício A — complementar <span>8 min</span></div>
+      <p>Use o gerador "3 grupos + dimensões de RUÍDO" do painel A3 e leve d de 2 a 256. Depois use "variedade 2D girada em d dimensões" e faça o mesmo.</p>
+      <ol>
+        <li>Nos dois casos o número de colunas é idêntico. Por que só um colapsa?</li>
+        <li>Um colega afirma: "meu conjunto tem 5000 atributos, então t-SNE não vai funcionar". Que informação você precisa pedir antes de concordar?</li>
+        <li>Como você estimaria essa informação na prática, usando apenas ferramentas já vistas na aula?</li>
+      </ol>
+      <details class="resp"><summary>Resposta</summary><div class="in">
+        <p><b>1.</b> O que governa não é o número de colunas, é a <b>dimensão intrínseca</b>. No primeiro gerador, cada coluna nova é ruído independente: acrescenta variância à distância sem acrescentar sinal, e a razão sinal/ruído cai como 1/√d. No segundo, todas as colunas são combinações lineares de apenas duas variáveis latentes — a dimensão intrínseca continua sendo 2 e o contraste não se move.</p>
+        <p><b>2.</b> Precisa saber quanta redundância existe entre os 5000 atributos, ou seja, a dimensão intrínseca. Também importa se há atributos puramente irrelevantes à estrutura que se quer enxergar.</p>
+        <p><b>3.</b> Estimativa barata e já disponível: rodar PCA e olhar a variância acumulada — se 30 componentes explicam 95%, a dimensão intrínseca linear é da ordem de 30 e não de 5000. É exatamente por isso que a recomendação padrão é aplicar PCA antes do t-SNE. Estimadores mais finos (correlação de dois pontos, máxima verossimilhança de Levina–Bickel) existem, mas para a decisão prática a curva de variância acumulada resolve.</p>
+      </div></details>
+    </div>
+  </div>
+
+  <h3>A6 · Vídeo complementar</h3>
+  <div class="col">
+    <p>Recurso externo indicado para reforçar o conteúdo deste anexo. Vale assistir antes do laboratório — as simulações acima ficam mais fáceis de interpretar depois de uma exposição narrada do mesmo argumento.</p>
+  </div>
+  <div class="bancada">
+    <div class="bc-top">
+      <span class="bc-id">VÍDEO</span>
+      <span class="bc-tt">material externo · YouTube</span>
+      <span class="bc-read"><a class="ref" href="https://www.youtube.com/watch?v=o_cAOa5fMhE" target="_blank" rel="noopener noreferrer">abrir no YouTube ↗</a></span>
+    </div>
+    <div class="bc-body">
+      <div class="video" id="ytBox" data-yt="o_cAOa5fMhE">
+        <button class="ytplay" id="ytBtn" aria-label="Carregar e reproduzir o vídeo">&#9654;</button>
+        <span class="ytcap" id="ytCap">clique para carregar o player</span>
+      </div>
+      <div class="leg">O player só é carregado ao clicar, via <code>youtube-nocookie.com</code> — nada é requisitado ao YouTube enquanto o vídeo não for iniciado. Se o player não abrir (alguns ambientes bloqueiam <em>iframes</em> de terceiros), use o link <b>abrir no YouTube</b> no cabeçalho.</div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /wrap -->
+
+<script>
+"use strict";
+/* ================= utilidades ================= */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function RNG(s){var f=mulberry(s);f.g=function(){var u=0,v=0;while(u===0)u=f();while(v===0)v=f();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v)};return f}
+var CL={},CANV=[],REINIT=[];
+function cssv(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function syncTheme(){
+  var k=['lin','tsne','umap','warn','red','tx','tx2','tx3'],i;
+  for(i=0;i<k.length;i++)CL[k[i]]=cssv('--'+k[i]);
+  CL.grid=cssv('--cgrid');CL.bg=cssv('--cbg');CL.imghi=cssv('--imghi');CL.onacc=cssv('--onacc');
+  CL.pal=[CL.lin,CL.tsne,CL.umap];
+  CL.mono=document.documentElement.getAttribute('data-pal')==='mono';
+  CL.light=document.documentElement.getAttribute('data-theme')==='light';
+}
+syncTheme();
+function hx(c){c=(c||'#000').replace('#','');if(c.length===3)c=c[0]+c[0]+c[1]+c[1]+c[2]+c[2];
+  return [parseInt(c.substr(0,2),16),parseInt(c.substr(2,2),16),parseInt(c.substr(4,2),16)]}
+function mix(a,b,t){return 'rgb('+Math.round(a[0]+(b[0]-a[0])*t)+','+Math.round(a[1]+(b[1]-a[1])*t)+','+Math.round(a[2]+(b[2]-a[2])*t)+')'}
+/* rampa para variáveis contínuas: viridis (segura para daltonismo) ou cinza */
+function ramp(t){
+  t=Math.max(0,Math.min(.9999,t));
+  if(CL.mono){var g=Math.round(CL.light?195-t*165:58+t*180);return 'rgb('+g+','+g+','+g+')'}
+  var A=[[68,1,84],[65,68,135],[42,120,142],[34,168,132],[122,209,81],[253,231,37]];
+  var x=t*(A.length-1),i=Math.floor(x),f=x-i;
+  return mix(A[i],A[i+1],f);
+}
+function repaint(){
+  syncTheme();
+  var i;for(i=0;i<REINIT.length;i++)REINIT[i]();
+  for(i=0;i<CANV.length;i++){CANV[i].fit();if(CANV[i].draw)CANV[i].draw()}
+}
+function C(id,h){
+  var el=document.getElementById(id); if(!el)return null;
+  el.style.height=h+'px';
+  var o={el:el,h:h,g:el.getContext('2d'),w:300,draw:null};
+  o.fit=function(){var dpr=Math.min(window.devicePixelRatio||1,2);o.w=el.clientWidth||600;el.width=Math.round(o.w*dpr);el.height=Math.round(h*dpr);o.g.setTransform(dpr,0,0,dpr,0,0);};
+  o.fit();
+  var t=null;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(function(){o.fit();if(o.draw)o.draw()},120)});
+  CANV.push(o);
+  return o;
+}
+function T(g,s,x,y,c,sz,al,mono){g.fillStyle=c;g.font=(sz||11)+'px '+(mono===false?'system-ui,sans-serif':'ui-monospace,Menlo,Consolas,monospace');g.textAlign=al||'left';g.textBaseline='alphabetic';g.fillText(s,x,y)}
+function clr(o){o.g.fillStyle=CL.bg;o.g.fillRect(0,0,o.w,o.h)}
+function clamp4(v){return v>4?4:(v<-4?-4:v)}
+function fmt(v,n){return v.toFixed(n===undefined?2:n).replace('.',',')}
+
+/* PCA genérica por potenciação iterada (para d pequeno/médio) */
+function covOf(Xc,n,d){
+  var cov=new Float64Array(d*d),i,a,b,r,ra;
+  for(i=0;i<n;i++){r=Xc[i];for(a=0;a<d;a++){ra=r[a];if(ra===0)continue;for(b=a;b<d;b++)cov[a*d+b]+=ra*r[b];}}
+  for(a=0;a<d;a++)for(b=a;b<d;b++){var v=cov[a*d+b]/n;cov[a*d+b]=v;cov[b*d+a]=v;}
+  return cov;
+}
+function topEig(cov,d,K,R,iters){
+  var comps=[],lams=[],v=new Float64Array(d),w=new Float64Array(d),c,it,a,b,s,nr,lam;
+  iters=iters||70;
+  for(c=0;c<K;c++){
+    for(a=0;a<d;a++)v[a]=R.g();
+    lam=0;
+    for(it=0;it<iters;it++){
+      for(a=0;a<d;a++){s=0;var off=a*d;for(b=0;b<d;b++)s+=cov[off+b]*v[b];w[a]=s}
+      nr=0;for(a=0;a<d;a++)nr+=w[a]*w[a];nr=Math.sqrt(nr);
+      if(nr<1e-14){break}
+      for(a=0;a<d;a++)v[a]=w[a]/nr; lam=nr;
+    }
+    comps.push(Float64Array.from(v));lams.push(lam);
+    for(a=0;a<d;a++)for(b=0;b<d;b++)cov[a*d+b]-=lam*v[a]*v[b];
+  }
+  return {comps:comps,lams:lams};
+}
+function pca2(X,n,d,R){
+  var mean=new Float64Array(d),i,j;
+  for(i=0;i<n;i++)for(j=0;j<d;j++)mean[j]+=X[i][j]/n;
+  var Xc=[];for(i=0;i<n;i++){var o=new Float64Array(d);for(j=0;j<d;j++)o[j]=X[i][j]-mean[j];Xc.push(o)}
+  var e=topEig(covOf(Xc,n,d),d,2,R,60);
+  var Z=[];
+  for(i=0;i<n;i++){var z0=0,z1=0;for(j=0;j<d;j++){z0+=Xc[i][j]*e.comps[0][j];z1+=Xc[i][j]*e.comps[1][j]}Z.push([z0,z1])}
+  return Z;
+}
+/* desenha nuvem 2D auto-escalada dentro de uma caixa */
+function cloud(g,box,pts,cols,r,alphaEdges){
+  var i,mnx=1e18,mxx=-1e18,mny=1e18,mxy=-1e18;
+  for(i=0;i<pts.length;i++){var p=pts[i];if(p[0]<mnx)mnx=p[0];if(p[0]>mxx)mxx=p[0];if(p[1]<mny)mny=p[1];if(p[1]>mxy)mxy=p[1]}
+  var sx=(box.w-24)/Math.max(mxx-mnx,1e-9),sy=(box.h-24)/Math.max(mxy-mny,1e-9),s=Math.min(sx,sy);
+  var ox=box.x+box.w/2-((mnx+mxx)/2)*s, oy=box.y+box.h/2+((mny+mxy)/2)*s;
+  var f=function(p){return [ox+p[0]*s, oy-p[1]*s]};
+  if(alphaEdges){g.strokeStyle=CL.tx3;g.globalAlpha=.35;g.lineWidth=.6;g.beginPath();
+    for(i=0;i<alphaEdges.length;i++){var e=alphaEdges[i],A=f(pts[e.i]),B=f(pts[e.j]);g.moveTo(A[0],A[1]);g.lineTo(B[0],B[1])}g.stroke();g.globalAlpha=1;}
+  for(i=0;i<pts.length;i++){var q=f(pts[i]);g.fillStyle=cols[i];g.beginPath();g.arc(q[0],q[1],r||2.6,0,6.2832);g.fill()}
+  return f;
+}
+function frame(g,box,title){
+  g.strokeStyle=CL.grid;g.lineWidth=1;g.strokeRect(box.x+.5,box.y+.5,box.w,box.h);
+  if(title)T(g,title,box.x+7,box.y+14,CL.tx3,10);
+}
+
+/* ================= DEMO 01 — concentração de distâncias ================= */
+(function(){
+  var cv=C('c1',220); if(!cv)return;
+  var R=RNG(11),N=190,DMAX=256,P=[],i,j;
+  for(i=0;i<N;i++){var r=new Float64Array(DMAX);for(j=0;j<DMAX;j++)r[j]=R();P.push(r)}
+  var d=2,anim=false,cache=null;
+  function calc(dd){
+    var ds=[],a,b,k,s,t;
+    for(a=0;a<N;a++)for(b=a+1;b<N;b++){s=0;for(k=0;k<dd;k++){t=P[a][k]-P[b][k];s+=t*t}ds.push(Math.sqrt(s))}
+    var mean=0;for(k=0;k<ds.length;k++)mean+=ds[k];mean/=ds.length;
+    var mn=1e18,mx=0;for(k=0;k<ds.length;k++){if(ds[k]<mn)mn=ds[k];if(ds[k]>mx)mx=ds[k]}
+    var B=52,hist=new Float64Array(B);
+    for(k=0;k<ds.length;k++){var bi=Math.floor(ds[k]/mean/2*B);if(bi>=0&&bi<B)hist[bi]++}
+    var hm=0;for(k=0;k<B;k++)if(hist[k]>hm)hm=hist[k];
+    return {hist:hist,hm:hm,B:B,mn:mn,mx:mx,mean:mean,contr:(mx-mn)/mn};
+  }
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    if(!cache)cache=calc(d);
+    var L=46,Rr=w-16,Tp=22,Bt=h-30;
+    g.strokeStyle=CL.grid;g.beginPath();g.moveTo(L,Bt+.5);g.lineTo(Rr,Bt+.5);g.stroke();
+    var bw=(Rr-L)/cache.B,k;
+    for(k=0;k<cache.B;k++){
+      var hh=(cache.hist[k]/cache.hm)*(Bt-Tp);
+      g.fillStyle=CL.lin;g.globalAlpha=.85;
+      g.fillRect(L+k*bw+.5,Bt-hh,Math.max(bw-1,1),hh);g.globalAlpha=1;
+    }
+    g.strokeStyle=CL.warn;g.setLineDash([4,3]);g.beginPath();
+    var xm=L+(Rr-L)/2;g.moveTo(xm,Tp-6);g.lineTo(xm,Bt);g.stroke();g.setLineDash([]);
+    T(g,'média',xm+5,Tp+2,CL.warn,10);
+    T(g,'0',L,Bt+15,CL.tx3,10);T(g,'1×',xm,Bt+15,CL.tx3,10,'center');T(g,'2×',Rr,Bt+15,CL.tx3,10,'right');
+    T(g,'distância / média',L,h-4,CL.tx3,10);
+    T(g,'frequência',6,Tp+4,CL.tx3,10);
+    T(g,'contraste relativo = '+fmt(cache.contr,2),Rr,Tp+2,cache.contr<2?CL.red:CL.tx,11,'right');
+    document.getElementById('r1').textContent='d = '+d;
+  }
+  cv.draw=draw;
+  var s1=document.getElementById('s1'),v1=document.getElementById('v1');
+  s1.addEventListener('input',function(){d=+s1.value;v1.textContent=d;cache=null;draw()});
+  document.getElementById('b1a').addEventListener('click',function(){
+    if(anim)return;anim=true;d=2;
+    (function step(){
+      d=Math.round(d*1.09+1);if(d>256)d=256;
+      s1.value=d;v1.textContent=d;cache=null;draw();
+      if(d<256)setTimeout(step,55);else anim=false;
+    })();
+  });
+  draw();
+})();
+
+/* ================= DEMO 02 — PCA em 2D ================= */
+(function(){
+  var cv=C('c2',360); if(!cv)return;
+  var R=RNG(5),pts=[],th=0.26,animT=null;
+  function gen(){
+    pts=[];var rot=R()*Math.PI,sx=1.9,sy=.35+R()*.45,i;
+    for(i=0;i<120;i++){var u=R.g()*sx,v=R.g()*sy;pts.push([u*Math.cos(rot)-v*Math.sin(rot),u*Math.sin(rot)+v*Math.cos(rot)])}
+    var mx=0,my=0;for(i=0;i<pts.length;i++){mx+=pts[i][0];my+=pts[i][1]}mx/=pts.length;my/=pts.length;
+    for(i=0;i<pts.length;i++){pts[i][0]-=mx;pts[i][1]-=my}
+  }
+  function cov(){var a=0,b=0,c=0,i;for(i=0;i<pts.length;i++){a+=pts[i][0]*pts[i][0];b+=pts[i][0]*pts[i][1];c+=pts[i][1]*pts[i][1]}var n=pts.length;return [a/n,b/n,c/n]}
+  function best(){var m=cov();return .5*Math.atan2(2*m[1],m[0]-m[2])}
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var pw=Math.min(w*.66,w-150),box={x:8,y:8,w:pw-16,h:h-16};
+    frame(g,box,'espaço original (centralizado)');
+    var s=Math.min(box.w,box.h)/9, cx=box.x+box.w/2, cy=box.y+box.h/2;
+    var ux=Math.cos(th),uy=Math.sin(th);
+    /* elipse de covariância */
+    var m=cov(),tr=m[0]+m[2],det=m[0]*m[2]-m[1]*m[1],l1=(tr+Math.sqrt(Math.max(tr*tr-4*det,0)))/2,l2=(tr-Math.sqrt(Math.max(tr*tr-4*det,0)))/2;
+    g.save();g.translate(cx,cy);g.rotate(-best());g.strokeStyle=CL.lin;g.globalAlpha=.28;g.lineWidth=1;
+    g.beginPath();g.ellipse(0,0,2*Math.sqrt(Math.max(l1,0))*s,2*Math.sqrt(Math.max(l2,0))*s,0,0,6.2832);g.stroke();g.globalAlpha=1;g.restore();
+    /* eixo */
+    g.strokeStyle=CL.lin;g.lineWidth=1.6;g.beginPath();
+    g.moveTo(cx-ux*box.w,cy+uy*box.w);g.lineTo(cx+ux*box.w,cy-uy*box.w);g.stroke();
+    var res=0,pro=0,i;
+    var showR=document.getElementById('k2').checked;
+    for(i=0;i<pts.length;i++){
+      var p=pts[i],t=p[0]*ux+p[1]*uy;pro+=t*t;
+      var qx=t*ux,qy=t*uy;res+=(p[0]-qx)*(p[0]-qx)+(p[1]-qy)*(p[1]-qy);
+      var X=cx+p[0]*s,Y=cy-p[1]*s,PX=cx+qx*s,PY=cy-qy*s;
+      if(showR){g.strokeStyle=CL.red;g.globalAlpha=.55;g.lineWidth=.9;g.beginPath();g.moveTo(X,Y);g.lineTo(PX,PY);g.stroke();g.globalAlpha=1}
+      g.fillStyle=CL.tx;g.globalAlpha=.85;g.beginPath();g.arc(X,Y,2.6,0,6.2832);g.fill();g.globalAlpha=1;
+      g.fillStyle=CL.lin;g.beginPath();g.arc(PX,PY,2,0,6.2832);g.fill();
+    }
+    var n=pts.length;pro/=n;res/=n;var tot=pro+res;
+    /* barras */
+    var bx=pw+10,bw=w-bx-14,by=60,bh=26;
+    T(g,'variância projetada',bx,by-8,CL.tx2,10);
+    g.fillStyle=CL.grid;g.fillRect(bx,by,bw,bh);
+    g.fillStyle=CL.lin;g.fillRect(bx,by,bw*(pro/tot),bh);
+    T(g,fmt(100*pro/tot,1)+'%',bx+6,by+18,CL.onacc,12);
+    T(g,'erro de reconstrução',bx,by+62,CL.tx2,10);
+    g.fillStyle=CL.grid;g.fillRect(bx,by+70,bw,bh);
+    g.fillStyle=CL.red;g.fillRect(bx,by+70,bw*(res/tot),bh);
+    T(g,fmt(100*res/tot,1)+'%',bx+6,by+88,CL.onacc,12);
+    T(g,'soma constante',bx,by+120,CL.tx3,10);
+    T(g,'= variância total',bx,by+134,CL.tx3,10);
+    T(g,'θ ótimo = '+fmt(((best()*180/Math.PI)+180)%180,1)+'°',bx,by+164,CL.warn,11);
+    T(g,'arraste sobre o gráfico',bx,h-14,CL.tx3,10);
+    document.getElementById('r2').textContent='θ = '+fmt(((th*180/Math.PI)%180+180)%180,1)+'°';
+    document.getElementById('v2').textContent=Math.round(((th*180/Math.PI)%180+180)%180)+'°';
+    document.getElementById('s2').value=Math.round(((th*180/Math.PI)%180+180)%180);
+  }
+  cv.draw=draw;
+  document.getElementById('s2').addEventListener('input',function(e){th=+e.target.value*Math.PI/180;draw()});
+  document.getElementById('k2').addEventListener('change',draw);
+  document.getElementById('b2b').addEventListener('click',function(){gen();draw()});
+  document.getElementById('b2a').addEventListener('click',function(){
+    if(animT)return;var tgt=best(),st=th;
+    var d=((tgt-st+Math.PI*1.5)%Math.PI)-Math.PI/2, k=0;
+    animT=setInterval(function(){k+=1/26;if(k>=1){k=1;clearInterval(animT);animT=null}
+      th=st+d*(1-Math.pow(1-k,3));draw()},16);
+  });
+  var drag=false;
+  function upd(ev){
+    var r=cv.el.getBoundingClientRect(),pw=Math.min(cv.w*.66,cv.w-150);
+    var cx=8+(pw-16)/2, cy=cv.h/2;
+    var x=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left-cx;
+    var y=cy-((ev.touches?ev.touches[0].clientY:ev.clientY)-r.top);
+    th=Math.atan2(y,x);draw();
+  }
+  cv.el.addEventListener('mousedown',function(e){drag=true;upd(e)});
+  window.addEventListener('mousemove',function(e){if(drag)upd(e)});
+  window.addEventListener('mouseup',function(){drag=false});
+  cv.el.addEventListener('touchstart',function(e){drag=true;upd(e);e.preventDefault()},{passive:false});
+  cv.el.addEventListener('touchmove',function(e){if(drag){upd(e);e.preventDefault()}},{passive:false});
+  window.addEventListener('touchend',function(){drag=false});
+  gen();draw();
+})();
+
+/* ================= DEMO 03 — PCA sobre imagens 12×12 ================= */
+(function(){
+  var cv=C('c3',400); if(!cv)return;
+  var R=RNG(99),S=12,D=S*S,N=300,X=[],M=null,cur=0,k=8,ready=false;
+  function img(){
+    var th=R()*Math.PI,a=1.5+R()*2.3,b=.65+R()*.75,cx=5.5+R.g()*1.2,cy=5.5+R.g()*1.2,amp=.7+R()*.3;
+    var im=new Float64Array(D),x,y;
+    for(y=0;y<S;y++)for(x=0;x<S;x++){
+      var dx=x-cx,dy=y-cy,u=dx*Math.cos(th)+dy*Math.sin(th),v=-dx*Math.sin(th)+dy*Math.cos(th);
+      im[y*S+x]=amp*Math.exp(-(u*u/(2*a*a)+v*v/(2*b*b)))+R()*.03;
+    }
+    return im;
+  }
+  function build(){
+    X=[];for(var i=0;i<N;i++)X.push(img());
+    var mean=new Float64Array(D),j;
+    for(i=0;i<N;i++)for(j=0;j<D;j++)mean[j]+=X[i][j]/N;
+    var Xc=[];for(i=0;i<N;i++){var o=new Float64Array(D);for(j=0;j<D;j++)o[j]=X[i][j]-mean[j];Xc.push(o)}
+    var cov=covOf(Xc,N,D),trace=0;for(j=0;j<D;j++)trace+=cov[j*D+j];
+    var e=topEig(cov,D,40,R,60);
+    M={mean:mean,Xc:Xc,comps:e.comps,lams:e.lams,trace:trace};
+    ready=true;
+  }
+  function tile(g,x,y,px,im,div){
+    var i,j,mx=0;for(i=0;i<D;i++)mx=Math.max(mx,Math.abs(im[i]));if(mx<1e-9)mx=1;
+    for(j=0;j<S;j++)for(i=0;i<S;i++){
+      var v=im[j*S+i]/mx;
+      if(div){var c=v>0?hx(CL.lin):hx(CL.red),al=Math.min(Math.abs(v),1);
+        g.fillStyle='rgba('+c[0]+','+c[1]+','+c[2]+','+al+')';}
+      else{var q=Math.max(0,Math.min(1,v));g.fillStyle=mix(hx(CL.bg),hx(CL.imghi),q);}
+      g.fillRect(x+i*px,y+j*px,px+.5,px+.5);
+    }
+    g.strokeStyle=CL.grid;g.strokeRect(x+.5,y+.5,S*px,S*px);
+  }
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    if(!ready){T(g,'calculando PCA de 300 imagens (144 dimensões)…',14,30,CL.tx2,12);return}
+    var px=Math.max(2,Math.min(4,(w-40)/(9*S+8*6)));
+    var tw=S*px,gap=(w-24-9*tw)/8,x0=12,i;
+    tile(g,x0,26,px,M.mean,false);T(g,'média',x0,22,CL.tx3,9);
+    for(i=0;i<8;i++){var xx=x0+(i+1)*(tw+gap);tile(g,xx,26,px,M.comps[i],true);
+      T(g,'PC'+(i+1),xx,22,CL.lin,9);
+      T(g,fmt(100*M.lams[i]/M.trace,1)+'%',xx,26+tw+11,CL.tx3,9);}
+    var yTop=26+tw+24;
+    /* espectro */
+    var bx={x:12,y:yTop,w:Math.min(w*.55,w-190)-12,h:h-yTop-14};
+    frame(g,bx,'espectro e variância acumulada');
+    var nb=30,bw=(bx.w-28)/nb,acc=0,pathX=[],pathY=[];
+    for(i=0;i<nb;i++){
+      var fr=M.lams[i]/M.trace;acc+=fr;
+      var hh=Math.min(fr/(M.lams[0]/M.trace),1)*(bx.h-46);
+      g.fillStyle=i<k?CL.lin:CL.tx3;g.globalAlpha=i<k?1:.45;
+      g.fillRect(bx.x+14+i*bw,bx.y+bx.h-18-hh,Math.max(bw-1.5,1.2),hh);g.globalAlpha=1;
+      pathX.push(bx.x+14+i*bw+bw/2);pathY.push(bx.y+bx.h-18-acc*(bx.h-46));
+    }
+    g.strokeStyle=CL.warn;g.lineWidth=1.4;g.beginPath();
+    for(i=0;i<nb;i++){if(i===0)g.moveTo(pathX[i],pathY[i]);else g.lineTo(pathX[i],pathY[i])}g.stroke();
+    var y90=bx.y+bx.h-18-0.9*(bx.h-46);
+    g.strokeStyle=CL.warn;g.globalAlpha=.4;g.setLineDash([3,3]);g.beginPath();g.moveTo(bx.x+10,y90);g.lineTo(bx.x+bx.w-6,y90);g.stroke();g.setLineDash([]);g.globalAlpha=1;
+    T(g,'90%',bx.x+bx.w-8,y90-4,CL.warn,9,'right');
+    var accK=0;for(i=0;i<k;i++)accK+=M.lams[i]/M.trace;
+    T(g,'k = '+k+' → '+fmt(100*accK,1)+'% da variância',bx.x+14,bx.y+bx.h-4,CL.tx2,10);
+    /* reconstrução */
+    var rx={x:bx.x+bx.w+12,y:yTop,w:w-(bx.x+bx.w+12)-12,h:bx.h};
+    frame(g,rx,'reconstrução');
+    var p2=Math.min(Math.floor((rx.w-30)/(2*S)),7);
+    var rec=new Float64Array(D),c,j,z;
+    for(c=0;c<k;c++){z=0;for(j=0;j<D;j++)z+=M.Xc[cur][j]*M.comps[c][j];for(j=0;j<D;j++)rec[j]+=z*M.comps[c][j]}
+    var err=0;for(j=0;j<D;j++){var e2=M.Xc[cur][j]-rec[j];err+=e2*e2}
+    for(j=0;j<D;j++)rec[j]+=M.mean[j];
+    var iy=rx.y+30;
+    tile(g,rx.x+10,iy,p2,X[cur],false);T(g,'original',rx.x+10,iy-6,CL.tx3,9);
+    tile(g,rx.x+18+S*p2,iy,p2,rec,false);T(g,'k = '+k,rx.x+18+S*p2,iy-6,CL.lin,9);
+    T(g,'erro quad. médio',rx.x+10,iy+S*p2+22,CL.tx3,9);
+    T(g,fmt(err/D,4),rx.x+10,iy+S*p2+38,CL.tx,13);
+    T(g,'dimensões: 144 → '+k,rx.x+10,iy+S*p2+60,CL.tx2,10);
+    T(g,'compressão '+fmt(144/k,1)+'×',rx.x+10,iy+S*p2+76,CL.umap,10);
+    document.getElementById('r3').textContent='k = '+k+' · '+fmt(100*accK,1)+'%';
+  }
+  cv.draw=draw;
+  document.getElementById('s3').addEventListener('input',function(e){k=+e.target.value;document.getElementById('v3').textContent=k;draw()});
+  document.getElementById('b3a').addEventListener('click',function(){cur=Math.floor(R()*N);draw()});
+  draw();
+  setTimeout(function(){build();draw()},60);
+})();
+
+/* ================= DEMO 04 — rocambole suíço ================= */
+(function(){
+  var cv=C('c4',330); if(!cv)return;
+  var R=RNG(3),N=620,P3=[],col=[],T3=[],i;
+  for(i=0;i<N;i++){
+    var t=1.6*Math.PI*(1+2*R()),hh=R()*21;
+    P3.push([t*Math.cos(t),hh,t*Math.sin(t)]);T3.push(t);
+  }
+  function recol(){col=[];for(var q=0;q<N;q++)col.push(ramp((T3[q]-1.6*Math.PI)/(3.2*Math.PI)))}
+  recol();
+  var Xa=[];for(i=0;i<N;i++)Xa.push(Float64Array.from(P3[i]));
+  var Zp=pca2(Xa,N,3,RNG(8));
+  var Zu=[];for(i=0;i<N;i++)Zu.push([T3[i]*2.1,P3[i][1]*0.9]);
+  var mode=0,mix=0,ay=0,spin=true,pair=null;
+  (function(){var bi=0,bj=0,bs=1e18;
+    for(var a=0;a<N;a+=3)for(var b=a+1;b<N;b+=3){
+      if(Math.abs(T3[a]-T3[b])<4.2)continue;
+      var dx=P3[a][0]-P3[b][0],dy=P3[a][1]-P3[b][1],dz=P3[a][2]-P3[b][2],s=dx*dx+dy*dy+dz*dz;
+      if(s<bs){bs=s;bi=a;bj=b}
+    } pair=[bi,bj,Math.sqrt(bs)];
+  })();
+  function proj(p){
+    var ax=.42,x1=p[0]*Math.cos(ay)-p[2]*Math.sin(ay),z1=p[0]*Math.sin(ay)+p[2]*Math.cos(ay);
+    var y1=(p[1]-10.5)*Math.cos(ax)-z1*Math.sin(ax);
+    return [x1,y1];
+  }
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);recol();
+    var box={x:8,y:8,w:w-16,h:h-16};
+    var tgt = mode===1?Zp:Zu, i,pts=[];
+    for(i=0;i<N;i++){
+      var a=proj(P3[i]);
+      if(mix>0){pts.push([a[0]*(1-mix)+tgt[i][0]*mix, a[1]*(1-mix)+tgt[i][1]*mix])}
+      else pts.push(a);
+    }
+    var f=cloud(g,box,pts,col,2.4);
+    if(document.getElementById('k4').checked&&pair){
+      var A=f(pts[pair[0]]),B=f(pts[pair[1]]);
+      g.strokeStyle=CL.warn;g.lineWidth=1.6;g.beginPath();g.moveTo(A[0],A[1]);g.lineTo(B[0],B[1]);g.stroke();
+      g.fillStyle=CL.warn;g.beginPath();g.arc(A[0],A[1],4.5,0,6.28);g.fill();g.beginPath();g.arc(B[0],B[1],4.5,0,6.28);g.fill();
+      T(g,'euclidiana '+fmt(pair[2],1)+'  ·  geodésica ≈ '+fmt(Math.abs(T3[pair[0]]*T3[pair[0]]-T3[pair[1]]*T3[pair[1]])/2,1),box.x+8,box.y+box.h-8,CL.warn,11);
+    }
+    var lab = mix>.5?(mode===1?'projeção PCA — camadas sobrepostas':'parametrização real (t, altura)'):'rotação 3D';
+    T(g,lab,box.x+8,box.y+16,mix>.5&&mode===1?CL.red:CL.tx2,11);
+    frame(g,box);
+    document.getElementById('r4').textContent=lab;
+  }
+  cv.draw=draw;
+  function loop(){
+    if(spin&&mix<.02){ay+=.011}
+    if(mode===0){mix=Math.max(0,mix-.03)}else{mix=Math.min(1,mix+.03)}
+    draw();requestAnimationFrame(loop);
+  }
+  document.getElementById('b4a').addEventListener('click',function(){mode=0;spin=true});
+  document.getElementById('b4b').addEventListener('click',function(){mode=1;spin=false});
+  document.getElementById('b4c').addEventListener('click',function(){mode=2;spin=false});
+  document.getElementById('k4').addEventListener('change',draw);
+  loop();
+})();
+
+/* ================= dados compartilhados (demos 05 e 06) ================= */
+function makeData(name,n){
+  var R=RNG(name.length*97+7),X=[],col=[],d=10,i,j;
+  var C3=CL.pal;
+  if(name==='blobs'||name==='uneven'){
+    var sizes,sig,cen;
+    if(name==='blobs'){sizes=[Math.round(n/3),Math.round(n/3),0];sizes[2]=n-sizes[0]-sizes[1];sig=[1,1,1];cen=[0,7,14]}
+    else{sizes=[Math.round(n*.2),Math.round(n*.3),0];sizes[2]=n-sizes[0]-sizes[1];sig=[.45,1.1,2.4];cen=[0,4.5,17]}
+    var dirs=[];
+    for(var c=0;c<3;c++){var v=[];for(j=0;j<d;j++)v.push(R.g());var nr=0;for(j=0;j<d;j++)nr+=v[j]*v[j];nr=Math.sqrt(nr);for(j=0;j<d;j++)v[j]/=nr;dirs.push(v)}
+    for(c=0;c<3;c++)for(i=0;i<sizes[c];i++){
+      var p=new Float64Array(d);
+      for(j=0;j<d;j++)p[j]=dirs[c][j]*cen[c]+R.g()*sig[c];
+      X.push(p);col.push(C3[c]);
+    }
+  }else if(name==='roll'){
+    d=3;
+    for(i=0;i<n;i++){var t=1.6*Math.PI*(1+2*R()),hh=R()*21;
+      X.push(Float64Array.from([t*Math.cos(t),hh,t*Math.sin(t)]));
+      col.push(ramp((t-1.6*Math.PI)/(3.2*Math.PI)));}
+  }else{
+    for(i=0;i<n;i++){var p2=new Float64Array(d);for(j=0;j<d;j++)p2[j]=R()*10;X.push(p2);
+      col.push(ramp(p2[0]/10));}
+  }
+  return {X:X,col:col,d:d,n:X.length};
+}
+
+/* ================= DEMO 05 — t-SNE ================= */
+(function(){
+  var cv=C('c5',330); if(!cv)return;
+  var st=null,running=false,N=170;
+  function buildP(X,n,perp){
+    var D=new Float64Array(n*n),i,j,k,s,t;
+    for(i=0;i<n;i++)for(j=i+1;j<n;j++){s=0;for(k=0;k<X[i].length;k++){t=X[i][k]-X[j][k];s+=t*t}D[i*n+j]=s;D[j*n+i]=s}
+    var mx=0;for(i=0;i<n*n;i++)if(D[i]>mx)mx=D[i];
+    for(i=0;i<n*n;i++)D[i]/=(mx/50);
+    var P=new Float64Array(n*n),row=new Float64Array(n),logU=Math.log(perp);
+    for(i=0;i<n;i++){
+      var beta=1,lo=-1e30,hi=1e30;
+      for(var it=0;it<60;it++){
+        s=0;for(j=0;j<n;j++){if(j===i){row[j]=0;continue}row[j]=Math.exp(-D[i*n+j]*beta);s+=row[j]}
+        if(s<1e-14)s=1e-14;
+        var H=0;for(j=0;j<n;j++){if(j===i)continue;var p=row[j]/s;if(p>1e-12)H-=p*Math.log(p)}
+        var diff=H-logU;if(Math.abs(diff)<1e-5)break;
+        if(diff>0){lo=beta;beta=(hi>1e29)?beta*2:(beta+hi)/2}else{hi=beta;beta=(lo<-1e29)?beta/2:(beta+lo)/2}
+      }
+      s=0;for(j=0;j<n;j++){if(j===i){row[j]=0;continue}row[j]=Math.exp(-D[i*n+j]*beta);s+=row[j]}
+      for(j=0;j<n;j++)P[i*n+j]=row[j]/s;
+    }
+    var S=new Float64Array(n*n),tot=0;
+    for(i=0;i<n;i++)for(j=0;j<n;j++){var v=(P[i*n+j]+P[j*n+i])/2;S[i*n+j]=v;tot+=v}
+    for(i=0;i<n*n;i++)S[i]=Math.max(S[i]/tot,1e-14);
+    return S;
+  }
+  function init(){
+    running=false;
+    var name=document.getElementById('d5').value,perp=+document.getElementById('s5').value;
+    var dat=makeData(name,N),n=dat.n,R=RNG(4);
+    var Y=new Float64Array(n*2);for(var i=0;i<n*2;i++)Y[i]=R.g()*.01;
+    st={n:n,dat:dat,P:buildP(dat.X,n,perp),Y:Y,dY:new Float64Array(n*2),
+        gains:new Float64Array(n*2).fill(1),iter:0,kl:0,
+        Z0:pca2(dat.X,n,dat.d,RNG(2))};
+    draw();
+  }
+  function step(){
+    var n=st.n,P=st.P,Y=st.Y,num=new Float64Array(n*n),qsum=0,i,j;
+    for(i=0;i<n;i++)for(j=i+1;j<n;j++){
+      var dx=Y[i*2]-Y[j*2],dy=Y[i*2+1]-Y[j*2+1],v=1/(1+dx*dx+dy*dy);
+      num[i*n+j]=v;num[j*n+i]=v;qsum+=2*v;
+    }
+    var ex=st.iter<110?12:1,grad=new Float64Array(n*2),kl=0;
+    for(i=0;i<n;i++){var gx=0,gy=0;
+      for(j=0;j<n;j++){if(i===j)continue;
+        var q=num[i*n+j]/qsum,m=4*(P[i*n+j]*ex-q)*num[i*n+j];
+        gx+=m*(Y[i*2]-Y[j*2]);gy+=m*(Y[i*2+1]-Y[j*2+1]);
+        if(ex===1)kl+=P[i*n+j]*Math.log(P[i*n+j]/Math.max(q,1e-14));
+      }
+      grad[i*2]=gx;grad[i*2+1]=gy;
+    }
+    var mom=st.iter<250?.5:.8,lr=180,k;
+    for(k=0;k<n*2;k++){
+      var sg=(grad[k]>0)!==(st.dY[k]>0);
+      st.gains[k]=sg?st.gains[k]+.2:st.gains[k]*.8;
+      if(st.gains[k]<.02)st.gains[k]=.02;
+      st.dY[k]=mom*st.dY[k]-lr*st.gains[k]*grad[k];
+      Y[k]+=st.dY[k];
+    }
+    var mx=0,my=0;for(i=0;i<n;i++){mx+=Y[i*2]/n;my+=Y[i*2+1]/n}
+    for(i=0;i<n;i++){Y[i*2]-=mx;Y[i*2+1]-=my}
+    if(ex===1)st.kl=kl;
+    st.iter++;
+  }
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var hw=(w-24)/2,L={x:8,y:8,w:hw,h:h-16},Rb={x:16+hw,y:8,w:hw,h:h-16};
+    frame(g,L,'espaço original (projeção PCA 2D)');frame(g,Rb,'mapa t-SNE');
+    cloud(g,L,st.Z0,st.dat.col,2.4);
+    var pts=[];for(var i=0;i<st.n;i++)pts.push([st.Y[i*2],st.Y[i*2+1]]);
+    cloud(g,Rb,pts,st.dat.col,2.6);
+    if(st.iter<110&&st.iter>0)T(g,'fase de exagero (×12)',Rb.x+8,Rb.y+Rb.h-8,CL.warn,10);
+    document.getElementById('r5').textContent='iter '+st.iter+' · KL '+(st.kl?fmt(st.kl,3):'—');
+  }
+  cv.draw=draw;
+  function loop(){
+    if(!running)return;
+    for(var s=0;s<4&&st.iter<620;s++)step();
+    draw();
+    if(st.iter>=620){running=false;document.getElementById('b5a').textContent='rodar'}
+    requestAnimationFrame(loop);
+  }
+  document.getElementById('b5a').addEventListener('click',function(){
+    if(st.iter>=620)init();
+    running=!running;this.textContent=running?'pausar':'rodar';if(running)loop();
+  });
+  document.getElementById('b5b').addEventListener('click',function(){init();document.getElementById('b5a').textContent='rodar'});
+  document.getElementById('d5').addEventListener('change',function(){init();document.getElementById('b5a').textContent='rodar'});
+  document.getElementById('s5').addEventListener('input',function(e){document.getElementById('v5').textContent=e.target.value});
+  document.getElementById('s5').addEventListener('change',function(){init();document.getElementById('b5a').textContent='rodar'});
+  REINIT.push(function(){running=false;document.getElementById('b5a').textContent='rodar';init()});
+  init();
+})();
+
+/* ================= DEMO 06 — UMAP simplificado ================= */
+(function(){
+  var cv=C('c6',330); if(!cv)return;
+  var st=null,running=false,N=170,EPS=320;
+  function ab(md){
+    var tb=[[0,1.93,.79],[.1,1.577,.895],[.2,1.30,.98],[.4,.85,1.20],[.6,.60,1.35],[.8,.42,1.50]],i;
+    for(i=0;i<tb.length-1;i++)if(md<=tb[i+1][0]){
+      var f=(md-tb[i][0])/(tb[i+1][0]-tb[i][0]);
+      return [tb[i][1]+f*(tb[i+1][1]-tb[i][1]),tb[i][2]+f*(tb[i+1][2]-tb[i][2])];
+    }
+    return [tb[5][1],tb[5][2]];
+  }
+  function graph(X,n,k){
+    var D=new Float64Array(n*n),i,j,q,s,t;
+    for(i=0;i<n;i++)for(j=i+1;j<n;j++){s=0;for(q=0;q<X[i].length;q++){t=X[i][q]-X[j][q];s+=t*t}s=Math.sqrt(s);D[i*n+j]=s;D[j*n+i]=s}
+    var W={},target=Math.log(k)/Math.LN2;
+    for(i=0;i<n;i++){
+      var idx=[];for(j=0;j<n;j++)if(j!==i)idx.push(j);
+      idx.sort(function(a,b){return D[i*n+a]-D[i*n+b]});
+      var nb=idx.slice(0,k),rho=D[i*n+nb[0]],lo=0,hi=1e9,sig=1;
+      for(var it=0;it<48;it++){
+        s=0;for(q=0;q<nb.length;q++)s+=Math.exp(-Math.max(D[i*n+nb[q]]-rho,0)/sig);
+        if(Math.abs(s-target)<1e-5)break;
+        if(s>target){hi=sig;sig=(lo+sig)/2}else{lo=sig;sig=(hi>1e8)?sig*2:(hi+sig)/2}
+      }
+      for(q=0;q<nb.length;q++){
+        var jj=nb[q],wv=Math.exp(-Math.max(D[i*n+jj]-rho,0)/sig);
+        var a=Math.min(i,jj),b=Math.max(i,jj),key=a*n+b;
+        if(!W[key])W[key]={i:a,j:b,x:0,y:0};
+        if(i===a)W[key].x=wv;else W[key].y=wv;
+      }
+    }
+    var E=[];for(var key in W){var e=W[key];E.push({i:e.i,j:e.j,w:e.x+e.y-e.x*e.y})}
+    return E;
+  }
+  function init(){
+    running=false;
+    var name=document.getElementById('d6').value,k=+document.getElementById('s6').value,md=+document.getElementById('s6b').value/100;
+    var dat=makeData(name,N),n=dat.n,R=RNG(6);
+    var Z0=pca2(dat.X,n,dat.d,RNG(2));
+    var sx=0;for(var i=0;i<n;i++)sx+=Z0[i][0]*Z0[i][0]+Z0[i][1]*Z0[i][1];
+    var sc=6/Math.sqrt(sx/n);
+    var Y=new Float64Array(n*2);
+    for(i=0;i<n;i++){Y[i*2]=Z0[i][0]*sc+R.g()*.05;Y[i*2+1]=Z0[i][1]*sc+R.g()*.05}
+    var p=ab(md);
+    st={n:n,dat:dat,Z0:Z0,Y:Y,E:graph(dat.X,n,k),a:p[0],b:p[1],ep:0,R:R};
+    draw();
+  }
+  function epoch(){
+    var n=st.n,Y=st.Y,a=st.a,b=st.b,R=st.R,alpha=1.0*(1-st.ep/EPS),e,i,j,s;
+    for(var q=0;q<st.E.length;q++){
+      e=st.E[q];if(R()>e.w)continue;i=e.i;j=e.j;
+      var dx=Y[i*2]-Y[j*2],dy=Y[i*2+1]-Y[j*2+1],d2=dx*dx+dy*dy,co=0;
+      if(d2>0)co=-2*a*b*Math.pow(d2,b-1)/(1+a*Math.pow(d2,b));
+      var gx=clamp4(co*dx)*alpha,gy=clamp4(co*dy)*alpha;
+      Y[i*2]+=gx;Y[i*2+1]+=gy;Y[j*2]-=gx;Y[j*2+1]-=gy;
+      for(s=0;s<5;s++){
+        var kx=(R()*n)|0;if(kx===i)continue;
+        dx=Y[i*2]-Y[kx*2];dy=Y[i*2+1]-Y[kx*2+1];d2=dx*dx+dy*dy;
+        var hx,hy;
+        if(d2>0){var c2=2*b/((.001+d2)*(1+a*Math.pow(d2,b)));hx=clamp4(c2*dx)*alpha;hy=clamp4(c2*dy)*alpha}
+        else{hx=4*alpha;hy=0}
+        Y[i*2]+=hx;Y[i*2+1]+=hy;
+      }
+    }
+    st.ep++;
+  }
+  function draw(){
+    var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var hw=(w-24)/2,L={x:8,y:8,w:hw,h:h-16},Rb={x:16+hw,y:8,w:hw,h:h-16};
+    frame(g,L,'grafo de k-vizinhos (sobre PCA 2D)');frame(g,Rb,'layout UMAP');
+    cloud(g,L,st.Z0,st.dat.col,2.3,document.getElementById('k6').checked?st.E:null);
+    var pts=[];for(var i=0;i<st.n;i++)pts.push([st.Y[i*2],st.Y[i*2+1]]);
+    cloud(g,Rb,pts,st.dat.col,2.6);
+    T(g,st.E.length+' arestas · a='+fmt(st.a,2)+' b='+fmt(st.b,2),L.x+8,L.y+L.h-8,CL.tx3,10);
+    document.getElementById('r6').textContent='época '+st.ep+' / '+EPS;
+  }
+  cv.draw=draw;
+  function loop(){
+    if(!running)return;
+    for(var s=0;s<3&&st.ep<EPS;s++)epoch();
+    draw();
+    if(st.ep>=EPS){running=false;document.getElementById('b6a').textContent='rodar'}
+    requestAnimationFrame(loop);
+  }
+  document.getElementById('b6a').addEventListener('click',function(){
+    if(st.ep>=EPS)init();
+    running=!running;this.textContent=running?'pausar':'rodar';if(running)loop();
+  });
+  document.getElementById('b6b').addEventListener('click',function(){init();document.getElementById('b6a').textContent='rodar'});
+  document.getElementById('d6').addEventListener('change',function(){init();document.getElementById('b6a').textContent='rodar'});
+  document.getElementById('k6').addEventListener('change',draw);
+  document.getElementById('s6').addEventListener('input',function(e){document.getElementById('v6').textContent=e.target.value});
+  document.getElementById('s6').addEventListener('change',function(){init();document.getElementById('b6a').textContent='rodar'});
+  document.getElementById('s6b').addEventListener('input',function(e){document.getElementById('v6b').textContent=fmt(+e.target.value/100,2)});
+  document.getElementById('s6b').addEventListener('change',function(){init();document.getElementById('b6a').textContent='rodar'});
+  REINIT.push(function(){running=false;document.getElementById('b6a').textContent='rodar';init()});
+  init();
+})();
+
+
+/* ================= ANEXO — maldição da dimensionalidade ================= */
+function axes(g,b){g.strokeStyle=CL.grid;g.lineWidth=1;g.beginPath();
+  g.moveTo(b.x,b.y+b.h+.5);g.lineTo(b.x+b.w,b.y+b.h+.5);g.moveTo(b.x+.5,b.y);g.lineTo(b.x+.5,b.y+b.h);g.stroke()}
+function histo(vals,lo,hi,B){var H=new Float64Array(B),i;
+  for(i=0;i<vals.length;i++){var k=Math.floor((vals[i]-lo)/(hi-lo)*B);if(k>=0&&k<B)H[k]++}
+  var m=0;for(i=0;i<B;i++)if(H[i]>m)m=H[i];return{H:H,m:m||1,B:B}}
+function barsOf(g,b,h,col){var w=b.w/h.B,i;g.fillStyle=col;g.globalAlpha=.85;
+  for(i=0;i<h.B;i++){var hh=(h.H[i]/h.m)*b.h;g.fillRect(b.x+i*w,b.y+b.h-hh,Math.max(w-1,.8),hh)}g.globalAlpha=1}
+function lgamma(x){var G=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5)return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);
+  x-=1;var a=c[0],t=x+G+0.5,i;for(i=1;i<G+2;i++)a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a)}
+
+/* A1 — volume na casca */
+(function(){
+  var cv=C('xc1',250); if(!cv)return;
+  var R=RNG(21),N=4000,d=3,eps=.10,rad=[];
+  function samp(){rad=[];for(var i=0;i<N;i++)rad.push(Math.pow(R(),1/d))}
+  function draw(){var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var hw=(w-30)/2,L={x:12,y:16,w:hw-10,h:h-48},Rb={x:hw+22,y:16,w:hw-10,h:h-48},i;
+    axes(g,L);barsOf(g,L,histo(rad,0,1,60),CL.lin);
+    T(g,'raio dos pontos',L.x,L.y-4,CL.tx3,10);
+    T(g,'0',L.x,L.y+L.h+14,CL.tx3,10);T(g,'1',L.x+L.w,L.y+L.h+14,CL.tx3,10,'right');
+    var xe=L.x+(1-eps)*L.w;g.strokeStyle=CL.warn;g.setLineDash([3,3]);g.beginPath();g.moveTo(xe,L.y);g.lineTo(xe,L.y+L.h);g.stroke();g.setLineDash([]);
+    var cnt=0;for(i=0;i<N;i++)if(rad[i]>1-eps)cnt++;
+    T(g,fmt(100*cnt/N,1)+'% na casca',L.x+L.w,L.y+12,CL.warn,11,'right');
+    axes(g,Rb);T(g,'fração na casca vs d',Rb.x,Rb.y-4,CL.tx3,10);
+    g.strokeStyle=CL.warn;g.lineWidth=1.6;g.beginPath();
+    for(i=1;i<=120;i++){var y=1-Math.pow(1-eps,i),X=Rb.x+(i/120)*Rb.w,Y=Rb.y+Rb.h-y*Rb.h;
+      if(i===1)g.moveTo(X,Y);else g.lineTo(X,Y)}g.stroke();
+    g.fillStyle=CL.lin;g.beginPath();g.arc(Rb.x+(d/120)*Rb.w,Rb.y+Rb.h-(1-Math.pow(1-eps,d))*Rb.h,4,0,6.29);g.fill();
+    T(g,'d = 1',Rb.x,Rb.y+Rb.h+14,CL.tx3,10);T(g,'120',Rb.x+Rb.w,Rb.y+Rb.h+14,CL.tx3,10,'right');
+    T(g,'100%',Rb.x+4,Rb.y+11,CL.tx3,10);
+    T(g,'raio mediano = '+fmt(Math.pow(.5,1/d),3),12,h-8,CL.tx2,11);
+    document.getElementById('xr1').textContent='d = '+d;}
+  cv.draw=draw;
+  document.getElementById('xs1').addEventListener('input',function(e){d=+e.target.value;document.getElementById('xv1').textContent=d;samp();draw()});
+  document.getElementById('xe1').addEventListener('input',function(e){eps=+e.target.value/100;document.getElementById('xve1').textContent=fmt(eps,2);draw()});
+  samp();draw();
+})();
+
+/* A2 — bola no cubo */
+(function(){
+  var cv=C('xc2',240); if(!cv)return;
+  var R=RNG(33),d=2,mc={};
+  function sim(dd){if(mc[dd]!==undefined)return mc[dd];var N=20000,c=0,i,j;
+    for(i=0;i<N;i++){var s2=0;for(j=0;j<dd;j++){var u=R()*2-1;s2+=u*u}if(s2<=1)c++}
+    mc[dd]=c/N;return mc[dd]}
+  function ratio(dd){return Math.exp((dd/2)*Math.log(Math.PI)-lgamma(dd/2+1)-dd*Math.log(2))}
+  function draw(){var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var b={x:46,y:18,w:w-66,h:h-52},lo=-9,i;axes(g,b);
+    function py(v){var l=Math.max(Math.log(v)/Math.LN10,lo);return b.y+b.h-(l-lo)/(0-lo)*b.h}
+    for(i=0;i>=lo;i-=3){var Y=py(Math.pow(10,i));g.strokeStyle=CL.grid;g.beginPath();g.moveTo(b.x,Y);g.lineTo(b.x+b.w,Y);g.stroke();
+      T(g,'10^'+i,4,Y+4,CL.tx3,9)}
+    g.strokeStyle=CL.lin;g.lineWidth=1.8;g.beginPath();
+    for(i=1;i<=24;i++){var X=b.x+((i-1)/23)*b.w,Y2=py(ratio(i));if(i===1)g.moveTo(X,Y2);else g.lineTo(X,Y2)}g.stroke();
+    for(i=1;i<=24;i++){var v=sim(i);if(v>0){g.fillStyle=CL.warn;g.beginPath();g.arc(b.x+((i-1)/23)*b.w,py(v),2.6,0,6.29);g.fill()}}
+    var X0=b.x+((d-1)/23)*b.w;g.strokeStyle=CL.tx3;g.setLineDash([3,3]);g.beginPath();g.moveTo(X0,b.y);g.lineTo(X0,b.y+b.h);g.stroke();g.setLineDash([]);
+    T(g,'d = 1',b.x,b.y+b.h+15,CL.tx3,10);T(g,'24',b.x+b.w,b.y+b.h+15,CL.tx3,10,'right');
+    T(g,'V_bola / V_cubo em d = '+d+' :  '+ratio(d).toExponential(2).replace('.',','),b.x,b.y+12,CL.tx,11);
+    var mcv=sim(d);
+    T(g,'Monte Carlo: '+(mcv>0?fmt(100*mcv,3)+'%':'0 de 20 000 amostras'),b.x,b.y+28,CL.warn,10);
+    document.getElementById('xr2').textContent='d = '+d;}
+  cv.draw=draw;
+  document.getElementById('xs2').addEventListener('input',function(e){d=+e.target.value;document.getElementById('xv2').textContent=d;draw()});
+  draw();
+})();
+
+/* A3 — concentração de distâncias */
+(function(){
+  var cv=C('xc3',300); if(!cv)return;
+  var NP=180,DM=256,gen='unif',d=2,cacheP={},curve={};
+  function build(name){
+    var R=RNG(name.length*31+5),P=[],i,j,q;
+    if(name==='unif'){for(i=0;i<NP;i++){var r=new Float64Array(DM);for(j=0;j<DM;j++)r[j]=R();P.push(r)}}
+    else if(name==='gauss'){for(i=0;i<NP;i++){var r2=new Float64Array(DM);for(j=0;j<DM;j++)r2[j]=R.g();P.push(r2)}}
+    else if(name==='noise'){for(i=0;i<NP;i++){var k=i%3,r3=new Float64Array(DM);
+        r3[0]=Math.cos(k*2.09)*4+R.g()*.6;r3[1]=Math.sin(k*2.09)*4+R.g()*.6;
+        for(j=2;j<DM;j++)r3[j]=R.g();P.push(r3)}}
+    else if(name==='signal'){var Cc=[],k2;
+      for(k2=0;k2<3;k2++){var v=new Float64Array(DM);for(j=0;j<DM;j++)v[j]=R.g()*1.4;Cc.push(v)}
+      for(i=0;i<NP;i++){var kk=i%3,r4=new Float64Array(DM);
+        for(j=0;j<DM;j++)r4[j]=Cc[kk][j]+R.g()*.55;P.push(r4)}}
+    else{var B=[];
+      for(j=0;j<2;j++){var b=new Float64Array(DM);for(q=0;q<DM;q++)b[q]=R.g();
+        var nr=0;for(q=0;q<DM;q++)nr+=b[q]*b[q];nr=Math.sqrt(nr);for(q=0;q<DM;q++)b[q]/=nr;B.push(b)}
+      for(i=0;i<NP;i++){var t=R()*6.283,rr=1+R()*3,u=rr*Math.cos(t),vv=rr*Math.sin(t),r5=new Float64Array(DM);
+        for(j=0;j<DM;j++)r5[j]=(u*B[0][j]+vv*B[1][j])*Math.sqrt(DM)*.9;P.push(r5)}}
+    return P}
+  function stats(P,dd){var ds=[],a,b,k,s2,t;
+    for(a=0;a<NP;a++)for(b=a+1;b<NP;b++){s2=0;for(k=0;k<dd;k++){t=P[a][k]-P[b][k];s2+=t*t}ds.push(Math.sqrt(s2))}
+    var mean=0,mn=1e18,mx=0;for(k=0;k<ds.length;k++){mean+=ds[k];if(ds[k]<mn)mn=ds[k];if(ds[k]>mx)mx=ds[k]}
+    mean/=ds.length;return{ds:ds,mean:mean,ct:(mx-mn)/mn}}
+  function curveOf(name){if(curve[name])return curve[name];
+    var P=cacheP[name]||(cacheP[name]=build(name)),out=[],dd;
+    for(dd=2;dd<=DM;dd=Math.max(dd+1,Math.round(dd*1.35)))out.push([dd,stats(P,dd).ct]);
+    curve[name]=out;return out}
+  function draw(){var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var P=cacheP[gen]||(cacheP[gen]=build(gen)),S=stats(P,d),i;
+    var hw=(w-30)/2,L={x:12,y:18,w:hw-10,h:h-52},Rb={x:hw+22,y:18,w:hw-10,h:h-52};
+    axes(g,L);
+    barsOf(g,L,histo(S.ds.map(function(x){return x/S.mean}),0,2,54),CL.lin);
+    T(g,'distâncias / média  (d = '+d+')',L.x,L.y-5,CL.tx3,10);
+    T(g,'0',L.x,L.y+L.h+14,CL.tx3,10);T(g,'1×',L.x+L.w/2,L.y+L.h+14,CL.tx3,10,'center');T(g,'2×',L.x+L.w,L.y+L.h+14,CL.tx3,10,'right');
+    var cu=curveOf(gen),mxc=0,mnc=1e9;
+    for(i=0;i<cu.length;i++){mxc=Math.max(mxc,cu[i][1]);if(cu[i][1]>0)mnc=Math.min(mnc,cu[i][1])}
+    var loY=Math.max(mnc*.6,.02),hiY=mxc*1.5;
+    axes(g,Rb);T(g,'contraste relativo vs d  (log-log)',Rb.x,Rb.y-5,CL.tx3,10);
+    var lx=function(dd){return Rb.x+(Math.log(dd)-Math.log(2))/(Math.log(DM)-Math.log(2))*Rb.w};
+    var ly=function(v){var t=(Math.log(Math.max(v,loY))-Math.log(loY))/(Math.log(hiY)-Math.log(loY));return Rb.y+Rb.h-t*Rb.h};
+    g.strokeStyle=CL.tx3;g.setLineDash([4,3]);g.lineWidth=1;g.beginPath();
+    for(i=0;i<cu.length;i++){var Xr=lx(cu[i][0]),Yr=ly(cu[0][1]*Math.sqrt(cu[0][0]/cu[i][0]));
+      if(i===0)g.moveTo(Xr,Yr);else g.lineTo(Xr,Yr)}g.stroke();g.setLineDash([]);
+    T(g,'∝ 1/√d',lx(DM)-4,ly(cu[0][1]*Math.sqrt(cu[0][0]/DM))-6,CL.tx3,9,'right');
+    if(1>loY&&1<hiY){g.strokeStyle=CL.warn;g.globalAlpha=.35;g.beginPath();g.moveTo(Rb.x,ly(1));g.lineTo(Rb.x+Rb.w,ly(1));g.stroke();g.globalAlpha=1;
+      T(g,'contraste = 1',Rb.x+4,ly(1)-4,CL.warn,9)}
+    g.strokeStyle=S.ct<1.2?CL.red:CL.umap;g.lineWidth=1.8;g.beginPath();
+    for(i=0;i<cu.length;i++){var X=lx(cu[i][0]),Y=ly(cu[i][1]);if(i===0)g.moveTo(X,Y);else g.lineTo(X,Y)}g.stroke();
+    g.fillStyle=CL.lin;g.beginPath();g.arc(lx(d),ly(S.ct),4,0,6.29);g.fill();
+    T(g,'d = 2',Rb.x,Rb.y+Rb.h+14,CL.tx3,10);T(g,'256',Rb.x+Rb.w,Rb.y+Rb.h+14,CL.tx3,10,'right');
+    T(g,fmt(hiY,1),Rb.x+4,Rb.y+11,CL.tx3,9);T(g,fmt(loY,2),Rb.x+4,Rb.y+Rb.h-4,CL.tx3,9);
+    T(g,'contraste = '+fmt(S.ct,2)+'  ·  '+(S.ct<1?'colapsou':'preservado'),12,h-8,S.ct<1?CL.red:CL.umap,11);
+    document.getElementById('xr3').textContent='d = '+d+' · contraste '+fmt(S.ct,2);}
+  cv.draw=draw;
+  document.getElementById('xg3').addEventListener('change',function(e){gen=e.target.value;draw()});
+  document.getElementById('xs3').addEventListener('input',function(e){d=+e.target.value;document.getElementById('xv3').textContent=d;draw()});
+  draw();
+})();
+
+/* A4 — ortogonalidade */
+(function(){
+  var cv=C('xc4',230); if(!cv)return;
+  var R=RNG(77),d=2,cos=[];
+  function samp(){cos=[];var M=30000,i,j;
+    for(i=0;i<M;i++){var dot=0,na=0,nb=0;
+      for(j=0;j<d;j++){var a=R.g(),b=R.g();dot+=a*b;na+=a*a;nb+=b*b}
+      cos.push(dot/Math.sqrt(na*nb))}}
+  function draw(){var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    var b={x:16,y:18,w:w-32,h:h-48},i;axes(g,b);
+    barsOf(g,b,histo(cos,-1,1,80),CL.lin);
+    var sd=1/Math.sqrt(d),peak=1/(sd*Math.sqrt(6.283185));
+    g.strokeStyle=CL.warn;g.lineWidth=1.6;g.beginPath();
+    for(i=0;i<=200;i++){var x=-1+2*i/200,y=Math.exp(-x*x/(2*sd*sd))/(sd*Math.sqrt(6.283185));
+      var X=b.x+(x+1)/2*b.w,Y=b.y+b.h-Math.min(y/peak,1)*b.h;
+      if(i===0)g.moveTo(X,Y);else g.lineTo(X,Y)}g.stroke();
+    var m=0,v=0;for(i=0;i<cos.length;i++)m+=cos[i]/cos.length;
+    for(i=0;i<cos.length;i++)v+=(cos[i]-m)*(cos[i]-m)/cos.length;
+    T(g,'−1',b.x,b.y+b.h+15,CL.tx3,10);T(g,'0',b.x+b.w/2,b.y+b.h+15,CL.tx3,10,'center');T(g,'+1',b.x+b.w,b.y+b.h+15,CL.tx3,10,'right');
+    T(g,'DP medido '+fmt(Math.sqrt(v),3)+'   ·   previsto 1/√d = '+fmt(sd,3),b.x+b.w,b.y+12,CL.tx,11,'right');
+    document.getElementById('xr4').textContent='d = '+d;}
+  cv.draw=draw;
+  document.getElementById('xs4').addEventListener('input',function(e){d=+e.target.value;document.getElementById('xv4').textContent=d;samp();draw()});
+  samp();draw();
+})();
+
+/* A5 — kNN sob dimensões extras (calculado sob demanda) */
+(function(){
+  var cv=C('xc5',280); if(!cv)return;
+  var res=null,started=false,MS=[0,2,5,10,20,40,80,160,250];
+  function run(){
+    var R=RNG(123),ntr=250,nte=250,K=5,out={noise:[],sig:[],cop:[]},mi;
+    for(mi=0;mi<MS.length;mi++){
+      var m=MS[mi],D=2+m;
+      var mk=function(N,kind){var X=[],y=[],i,j;
+        for(i=0;i<N;i++){var lab=i%2,r=new Float64Array(D),sg=lab?1:-1;
+          r[0]=sg*1.05+R.g();r[1]=sg*1.05+R.g();
+          for(j=2;j<D;j++){
+            if(kind==='noise')r[j]=R.g();
+            else if(kind==='sig')r[j]=sg*0.35+R.g();
+            else r[j]=(r[0]+r[1])/2+R.g()*1.4;}
+          X.push(r);y.push(lab)}
+        return{X:X,y:y}};
+      ['noise','sig','cop'].forEach(function(kind){
+        var tr=mk(ntr,kind),te=mk(nte,kind),ok=0,i,j,q;
+        for(i=0;i<nte;i++){var best=[];
+          for(j=0;j<ntr;j++){var s2=0;for(q=0;q<D;q++){var t=te.X[i][q]-tr.X[j][q];s2+=t*t}best.push([s2,tr.y[j]])}
+          best.sort(function(a,b2){return a[0]-b2[0]});
+          var v=0;for(j=0;j<K;j++)v+=best[j][1];
+          if((v>K/2?1:0)===te.y[i])ok++}
+        out[kind].push(ok/nte)});
+    }
+    res=out}
+  function draw(){var g=cv.g,w=cv.w,h=cv.h;clr(cv);
+    if(!res){T(g,started?'simulando 27 treinos de kNN…':'role até este painel para executar a simulação',16,32,CL.tx2,12);return}
+    var b={x:48,y:20,w:w-66,h:h-54},lo=.45,hi=1,i,k;axes(g,b);
+    for(k=5;k<=10;k++){var Y=b.y+b.h-((k/10-lo)/(hi-lo))*b.h;g.strokeStyle=CL.grid;g.beginPath();g.moveTo(b.x,Y);g.lineTo(b.x+b.w,Y);g.stroke();
+      T(g,(k*10)+'%',6,Y+4,CL.tx3,9)}
+    var lx=function(m){return b.x+(Math.log(m+1)/Math.log(251))*b.w};
+    [['noise',CL.red],['sig',CL.umap],['cop',CL.lin]].forEach(function(S){
+      g.strokeStyle=S[1];g.lineWidth=2;g.beginPath();
+      for(i=0;i<MS.length;i++){var X=lx(MS[i]),Y=b.y+b.h-((res[S[0]][i]-lo)/(hi-lo))*b.h;
+        if(i===0)g.moveTo(X,Y);else g.lineTo(X,Y)}g.stroke();
+      for(i=0;i<MS.length;i++){var X2=lx(MS[i]),Y2=b.y+b.h-((res[S[0]][i]-lo)/(hi-lo))*b.h;
+        g.fillStyle=S[1];g.beginPath();g.arc(X2,Y2,3,0,6.29);g.fill()}
+      var last=res[S[0]][MS.length-1];
+      T(g,fmt(100*last,1)+'%',b.x+b.w-2,b.y+b.h-((last-lo)/(hi-lo))*b.h-6,S[1],11,'right')});
+    for(i=0;i<MS.length;i++)T(g,''+MS[i],lx(MS[i]),b.y+b.h+15,CL.tx3,9,'center');
+    T(g,'dimensões acrescentadas às 2 originais (escala log)',b.x,h-6,CL.tx3,10);
+    document.getElementById('xr5').textContent='ruído: '+fmt(100*res.noise[0],0)+'% → '+fmt(100*res.noise[MS.length-1],0)+'%';}
+  cv.draw=draw;draw();
+  function maybe(){if(started)return;
+    if(cv.el.getBoundingClientRect().top<(window.innerHeight||800)+500){started=true;draw();
+      setTimeout(function(){run();draw()},40)}}
+  window.addEventListener('scroll',maybe,{passive:true});maybe();
+})();
+
+/* ---- vídeo complementar: carregamento sob demanda ---- */
+(function(){
+  var box=document.getElementById('ytBox'),btn=document.getElementById('ytBtn'),cap=document.getElementById('ytCap');
+  if(!box||!btn)return;
+  var id=box.getAttribute('data-yt');
+  var im=new Image();
+  im.onload=function(){if(im.naturalWidth>2)box.style.backgroundImage='url('+im.src+')'};
+  im.src='https://i.ytimg.com/vi/'+id+'/hqdefault.jpg';
+  btn.addEventListener('click',function(){
+    var f=document.createElement('iframe');
+    f.setAttribute('src','https://www.youtube-nocookie.com/embed/'+id+'?rel=0&autoplay=1');
+    f.setAttribute('title','Vídeo complementar');
+    f.setAttribute('allow','accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+    f.setAttribute('allowfullscreen','');
+    box.classList.add('on');
+    if(cap)cap.remove();
+    btn.remove();
+    box.appendChild(f);
+  });
+})();
+
+/* ================= controle de tema ================= */
+(function(){
+  var root=document.documentElement,th=document.getElementById('thSel'),pl=document.getElementById('palSel');
+  if(!th||!pl)return;
+  th.addEventListener('change',function(){root.setAttribute('data-theme',th.value);repaint()});
+  pl.addEventListener('change',function(){root.setAttribute('data-pal',pl.value);repaint()});
+})();
+
+/* ================= linha do tempo ================= */
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.tl-track a')),fill=document.getElementById('tlf');
+  if(!links.length||!fill)return;
+  links.forEach(function(a){var m=+a.dataset.min;a.style.left=(m/120*100)+'%'});
+  var secs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))});
+  function upd(){
+    var cur=0,i;
+    for(i=0;i<secs.length;i++){if(secs[i]&&secs[i].getBoundingClientRect().top<=110)cur=i}
+    links.forEach(function(a,k){a.classList.toggle('on',k===cur)});
+    fill.style.width=(+links[cur].dataset.min/120*100)+'%';
+  }
+  var tick=false;
+  window.addEventListener('scroll',function(){if(tick)return;tick=true;requestAnimationFrame(function(){upd();tick=false})},{passive:true});
+  upd();
+})();
+</script>
+</body>
+</html>
