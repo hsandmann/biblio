@@ -24435,7 +24435,7 @@ iVBORw0KGgoAAAANSUhEUgAAAUAAAAD9CAYAAADNs661AAA5t0lEQVR4nO19zY8ex53eQy+9zEqkB6I8
     <li><strong>ANOVA de um fator</strong> compara as <strong>médias</strong>. Testa se a variação <em>entre</em> os grupos é grande em relação à variação <em>dentro</em> de cada um; essa razão é a estatística F, que fica em torno de 1 quando as médias são iguais. Exige resíduos aproximadamente normais e <strong>variâncias parecidas</strong>.</li>
     <li><strong>Kruskal-Wallis</strong> é a versão não paramétrica: descarta os valores e usa só a <strong>ordem</strong>. Enfileira todas as observações, atribui postos de 1 a N e verifica se o posto médio de cada grupo se afasta do valor esperado quando não há diferença. Não exige normalidade e é robusto a caudas pesadas, porque o maior valor vira apenas "o último posto".</li>
   </ul>
-  <p>Aqui os pressupostos da ANOVA falham nos dois lados — os desvios padrão vão de 70.002 a 122.791 e Levene rejeita a igualdade de variâncias, além de as distribuições serem assimétricas. <strong>Kruskal-Wallis é o teste que reportamos.</strong></p>
+  <p>Aqui os pressupostos da ANOVA falham nos dois lados — os desvios padrão vão de 70.008 (<code>INLAND</code>) a 122.819 (<code>NEAR BAY</code>) e Levene rejeita a igualdade de variâncias, além de as distribuições serem assimétricas. <strong>Kruskal-Wallis é o teste que reportamos.</strong></p>
 
 <pre>grupos = [g.median_house_value.values <b>for</b> _, g <b>in</b> df.groupby(<i>"ocean_proximity"</i>)]
 

@@ -4721,7 +4721,7 @@ L 845.700313 29.708775
   <div class="box box--trap">
     <h5>Toda imputação mente — a questão é o tamanho da mentira</h5>
     <p>O desvio padrão de <code>Age</code> cai de <strong>14,53</strong> para <strong>13,02</strong> com a mediana global: inventamos 177 valores sem nenhuma variabilidade, e o modelo passa a acreditar que a idade é mais homogênea do que é. Intervalos de confiança calculados depois disso ficam estreitos demais.</p>
-    <p>A imputação por grupo recupera parte da variância (13,30) e, mais importante, <em>acerta melhor por passageiro</em>: <code>Master</code> tem mediana de 3,5 anos — são meninos. Atribuir 28 anos a eles é um erro de 24 anos que a versão por título não comete. Para fazer melhor que isso, existe a <strong>imputação múltipla</strong>, que gera vários valores plausíveis e propaga a incerteza; é o padrão em estatística inferencial e raro em ML aplicado.</p>
+    <p>A imputação por grupo recupera parte da variância (13,30) e, mais importante, <em>acerta melhor por passageiro</em>: <code>Master</code> tem mediana de 3,5 anos — são meninos. Atribuir 28 anos a eles é um erro de 24,5 anos que a versão por título não comete. Para fazer melhor que isso, existe a <strong>imputação múltipla</strong>, que gera vários valores plausíveis e propaga a incerteza; é o padrão em estatística inferencial e raro em ML aplicado.</p>
   </div>
   <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
 </section>
@@ -6875,7 +6875,7 @@ L 810.72 29.431963
   </div>
 
   <h3 id="s4-2"><span>4.2</span>Igualar a escala</h3>
-  <p>As amplitudes brutas: <code>Fare</code> vai de 0 a 512,33; <code>Age</code> de 0,42 a 80; <code>SibSp</code> de 0 a 8. Numa distância euclidiana, uma diferença de 100 libras pesa 12 vezes mais que a diferença entre um recém-nascido e um octogenário.</p>
+  <p>As amplitudes brutas: <code>Fare</code> vai de 0 a 512,33; <code>Age</code> de 0,42 a 80; <code>SibSp</code> de 0 a 8. Numa distância euclidiana cada variável contribui na proporção da sua <strong>variância</strong>, e as variâncias brutas aqui são de 2.467 para <code>Fare</code>, 169 para <code>Age</code>, 1,2 para <code>SibSp</code> e 0,6 para <code>Parch</code>. Ou seja: <strong><code>Fare</code> sozinha responde por 93,5% da distância entre dois passageiros</strong>, <code>Age</code> por 6,4% e as duas contagens de família por praticamente nada. Sem escalonar, "distância entre passageiros" significa, na prática, "diferença de tarifa".</p>
 <pre><b>from</b> sklearn.preprocessing <b>import</b> (StandardScaler, MinMaxScaler,
                                    RobustScaler, MaxAbsScaler)
 
