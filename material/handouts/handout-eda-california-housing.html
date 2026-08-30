@@ -22609,14 +22609,85 @@ L 821.758105 20.418516
   <div class="box box--obs">
     <h5>Três blocos de leitura</h5>
     <ul>
-      <li><b>Bloco de tamanho:</b> <code>cômodos</code>, <code>quartos</code>, <code>pop</code> e <code>domic</code> se correlacionam de 0,86 a 0,98. As quatro medem <em>o tamanho do distrito</em>. Redundância, não descoberta.</li>
+      <li><b>Bloco de tamanho:</b> <code>cômodos</code>, <code>quartos</code>, <code>pop</code> e <code>domic</code> se correlacionam de 0,86 a 0,98. As quatro medem <em>o tamanho do distrito</em>. Redundância, não descoberta — a seção 5.3 abre esse bloco.</li>
       <li><b>Geografia:</b> <code>lon</code> × <code>lat</code> = −0,92, a segunda maior correlação da matriz. Não é achado científico — é o formato da Califórnia, e o gráfico abaixo mostra por quê.</li>
       <li><b>O alvo:</b> só <code>renda</code> passa de 0,15. Um modelo linear com features cruas será fraco.</li>
       <li><b>Detalhe fino:</b> <code>renda</code> × <code>cômodos</code> = 0,20 mas <code>renda</code> × <code>quartos</code> = −0,01. Distritos ricos têm mais cômodos <em>que não são quartos</em>. A razão <code>quartos/cômodos</code> vira a melhor feature derivada, com r = −0,256.</li>
     </ul>
   </div>
 
-  <h3 id="s5-3"><span>5.3</span>Além da correlação: tendência local</h3>
+    <h3 id="s5-3"><span>5.3</span>Colinearidade: quando quatro colunas são uma só</h3>
+  <p>O bloco vermelho no canto do heatmap merece nome próprio. Quando duas ou mais variáveis carregam essencialmente a mesma informação, diz-se que elas são <strong>colineares</strong> — e o California Housing é um caso de manual.</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>par</th><th class="num">r</th><th class="num">r²</th><th>leitura</th></tr></thead>
+    <tbody>
+      <tr><td><code>total_bedrooms</code> × <code>households</code></td><td class="num">0,980</td><td class="num">0,960</td><td>saber uma explica <strong>96%</strong> da variação da outra</td></tr>
+      <tr><td><code>total_rooms</code> × <code>total_bedrooms</code></td><td class="num">0,930</td><td class="num">0,866</td><td>87%</td></tr>
+      <tr><td><code>total_rooms</code> × <code>households</code></td><td class="num">0,918</td><td class="num">0,844</td><td>84%</td></tr>
+      <tr><td><code>population</code> × <code>households</code></td><td class="num">0,907</td><td class="num">0,823</td><td>82%</td></tr>
+      <tr><td><code>total_bedrooms</code> × <code>population</code></td><td class="num">0,878</td><td class="num">0,770</td><td>77%</td></tr>
+      <tr><td><code>total_rooms</code> × <code>population</code></td><td class="num">0,857</td><td class="num">0,735</td><td>74%</td></tr>
+    </tbody>
+    <caption>O r² é simplesmente o quadrado da correlação: a fração da variância de uma coluna que a outra já explica. Nenhum par fica abaixo de 74%.</caption>
+  </table>
+  </div>
+
+  <p>Nada disso é misterioso: as quatro são <strong>contagens do mesmo distrito</strong>. Distrito grande tem mais cômodos, mais quartos, mais gente e mais domicílios. As quatro colunas medem tamanho.</p>
+
+  <h4>O argumento decisivo: elas não servem para prever</h4>
+  <p>Se as quatro dizem a mesma coisa, ao menos essa coisa deveria ser útil. Não é:</p>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>coluna bruta</th><th class="num">r com o alvo</th><th>feature derivada</th><th class="num">r com o alvo</th></tr></thead>
+    <tbody>
+      <tr><td><code>total_bedrooms</code></td><td class="num">+0,050</td><td><code>bedrooms_per_room</code></td><td class="num"><strong>−0,256</strong></td></tr>
+      <tr><td><code>total_rooms</code></td><td class="num">+0,134</td><td><code>rooms_per_household</code></td><td class="num">+0,152</td></tr>
+      <tr><td><code>population</code></td><td class="num">−0,025</td><td><code>pop_per_household</code></td><td class="num">−0,024</td></tr>
+      <tr><td><code>households</code></td><td class="num">+0,066</td><td>—</td><td class="num">—</td></tr>
+    </tbody>
+    <caption>Correlação de Pearson com <code>median_house_value</code>, 20.640 distritos.</caption>
+  </table>
+  </div>
+
+  <p>Nenhuma das quatro passa de 0,14. E faz sentido: <strong>o tamanho do distrito é um artefato de como o censo desenhou os polígonos</strong>, não uma propriedade dos imóveis. Um distrito com o dobro de cômodos não tem casas mais caras — tem mais casas.</p>
+
+  <h4>A saída: dividir pelo que causa a redundância</h4>
+  <p>Se as quatro crescem juntas porque o distrito é grande, basta <strong>remover o tamanho</strong> dividindo uma pela outra. É de onde vêm as features derivadas que a aula usa mais adiante, e o ganho aparece nas duas pontas:</p>
+  <ul>
+    <li><strong>A relação com o alvo melhora.</strong> <code>total_bedrooms</code> tinha r = +0,050; a razão <code>bedrooms_per_room</code> tem <strong>−0,256</strong>, cinco vezes mais em módulo. A pergunta mudou de "quantos quartos há no distrito" para "que fração dos cômodos é quarto" — e essa segunda pergunta é sobre o <em>tipo</em> de imóvel, não sobre o tamanho do recorte.</li>
+    <li><strong>A redundância desaparece.</strong> Entre as quatro brutas, a maior correlação era <strong>0,980</strong>. Entre as três derivadas, a maior é <strong>0,417</strong> — e duas delas são praticamente independentes: <code>rooms_per_household</code> × <code>pop_per_household</code> dá r = −0,005.</li>
+  </ul>
+
+<pre><u># a colinearidade, em duas linhas</u>
+tam = [<i>"total_rooms"</i>, <i>"total_bedrooms"</i>, <i>"population"</i>, <i>"households"</i>]
+df[tam].corr().round(<em>3</em>)                    <u># nenhum par abaixo de 0,857</u>
+df[tam].corrwith(df.median_house_value).round(<em>3</em>)   <u># nenhum passa de 0,134</u>
+
+<u># dividir pelo que causa a redundância</u>
+df[<i>"rooms_per_household"</i>] = df.total_rooms / df.households
+df[<i>"bedrooms_per_room"</i>]   = df.total_bedrooms / df.total_rooms
+<u># pop_por_domicilio já foi criada na checagem de sanidade do bloco 2</u>
+
+der = [<i>"rooms_per_household"</i>, <i>"bedrooms_per_room"</i>, <i>"pop_por_domicilio"</i>]
+df[der].corr().round(<em>3</em>)                    <u># maior |r| fora da diagonal: 0,417</u>
+df[der].corrwith(df.median_house_value).round(<em>3</em>)   <u># [0.152, -0.256, -0.024]</u></pre>
+
+  <div class="box box--note">
+    <h5>O que o EDA decide aqui, e o que ele não decide</h5>
+    <p><strong>Decide:</strong> que existe redundância, quais colunas a formam, e que há uma transformação natural que a desfaz. Isso é observação, e sai inteiro da matriz de correlação que você já tem.</p>
+    <p><strong>Não decide:</strong> se colinearidade é problema. <em>Depende do modelo.</em> Árvores e florestas convivem bem com ela — apenas repartem a importância entre colunas equivalentes. Modelos lineares sofrem: os coeficientes ficam instáveis e trocam de sinal com pequenas mudanças na amostra, embora a <em>predição</em> continue razoável. Diagnósticos como o VIF, e o que fazer a respeito, pertencem à aula de regressão.</p>
+    <p>A regra prática do EDA é mais modesta e mais segura: <strong>registre a redundância no data card e proponha a feature derivada</strong>. Quem escolher o modelo decidirá se precisa fazer mais.</p>
+  </div>
+
+  <div class="box box--trap">
+    <h5>Cuidado com a razão que devolve a redundância pela porta dos fundos</h5>
+    <p>Dividir resolve, mas nem toda divisão serve. <code>total_bedrooms / total_rooms</code> funciona porque numerador e denominador crescem <em>juntos</em> com o tamanho, e o quociente cancela o fator comum. Já <code>total_rooms / longitude</code> não cancela nada — produziria uma coluna nova tão redundante quanto a original e ainda sem sentido físico.</p>
+    <p>O teste é simples e você já sabe fazê-lo: <strong>calcule a correlação da razão com as colunas de origem</strong>. Se continuar alta, a divisão não removeu o que você queria remover.</p>
+  </div>
+<h3 id="s5-4"><span>5.4</span>Além da correlação: tendência local</h3>
 <pre>sns.regplot(data=df.sample(<em>3000</em>, random_state=<em>0</em>), x=<i>"median_income"</i>,
             y=<i>"median_house_value"</i>, lowess=<b>True</b>,
             scatter_kws=<b>dict</b>(s=<em>6</em>, alpha=<em>.2</em>), line_kws=<b>dict</b>(color=<i>"#7A2E86"</i>))</pre>
@@ -26586,7 +26657,7 @@ df[<i>"population_per_household"</i>] = df.population / df.households</pre>
     <thead><tr><th>feature</th><th class="num">r com o alvo</th><th class="num">máximo</th><th>origem no EDA</th></tr></thead>
     <tbody>
       <tr><td>bedrooms_per_room</td><td class="num">−0,256</td><td class="num">1,00</td><td>bloco 5.2: renda × cômodos = 0,20, renda × quartos = −0,01</td></tr>
-      <tr><td>rooms_per_household</td><td class="num">0,152</td><td class="num">141,9</td><td>bloco 1.2: contagens só fazem sentido normalizadas</td></tr>
+      <tr><td>rooms_per_household</td><td class="num">0,152</td><td class="num">141,9</td><td>seção 5.3: quebra a colinearidade do bloco de tamanho</td></tr>
       <tr><td>population_per_household</td><td class="num">−0,024</td><td class="num">1.243,3</td><td>bloco 2.3: ocupação como checagem de sanidade</td></tr>
       <tr><td>total_bedrooms (cru)</td><td class="num">0,050</td><td class="num">6.445</td><td><em>para comparação</em></td></tr>
     </tbody>
