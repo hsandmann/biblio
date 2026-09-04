@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Laboratório autoguiado: agrupar 178 vinhos</title>
+<style>:root{
+  /* ---- superfícies ---- */
+  --paper:#EBEEE8; --paper-2:#F7F8F4; --card:#FFFFFF;
+  --code:#F2F5F0;          /* fundo dos blocos de código */
+  --video:#0C1116;         /* placeholder de vídeo, único fundo escuro */
+  /* ---- tinta ---- */
+  --ink:#13242B; --ink-soft:#4C5F66; --ink-faint:#849498;
+  /* ---- acentos: um por método, mais os de alerta ---- */
+  --hydro:#1F6B8E;      /* PCA   */
+  --revision:#7A2E86;   /* t-SNE */
+  --veg:#5A7A3F;        /* UMAP  */
+  --contour:#A8763F; --danger:#9E3B2E;
+  /* ---- linhas ---- */
+  --rule:rgba(19,36,43,.14); --rule-strong:rgba(19,36,43,.30);
+  --canvas-grid:#DDE4DC;   /* opaco: canvas não compõe alfa como o CSS */
+  /* ---- tipografia ---- */
+  --display:'Archivo',system-ui,-apple-system,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  /* ---- medidas ---- */
+  --rail:250px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{
+  margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--body);font-size:17px;line-height:1.66;letter-spacing:.002em;
+  -webkit-font-smoothing:antialiased;
+}
+img,canvas{max-width:100%}
+a{color:var(--hydro);text-underline-offset:3px;text-decoration-thickness:1px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2.5px solid var(--revision);outline-offset:3px}
+
+
+/* ---------- RAIL / LEGENDA ---------- */
+.rail{
+  position:fixed;inset:0 auto 0 0;width:var(--rail);
+  background:var(--paper-2);border-right:1px solid var(--rule-strong);
+  padding:22px 0 40px;overflow-y:auto;z-index:40;
+}
+.rail__brand{padding:0 18px 14px;border-bottom:1px solid var(--rule)}
+.rail__mark{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--contour);display:block;margin-bottom:6px;
+}
+.rail__title{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.22;letter-spacing:-.008em;margin:0}
+.rail__sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:6px;letter-spacing:.04em}
+.rail nav{padding:12px 0 0}
+.rail h4{
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-faint);margin:16px 18px 6px;font-weight:600;
+}
+.rail a{
+  display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;
+  padding:6px 18px;font-family:var(--display);font-weight:500;font-size:12.8px;line-height:1.34;
+  color:var(--ink-soft);text-decoration:none;border-left:2.5px solid transparent;
+}
+.rail a b{font-family:var(--mono);font-weight:500;font-size:10.5px;color:var(--contour)}
+.rail a:hover{color:var(--ink);background:rgba(31,107,142,.06)}
+.rail a.on{color:var(--revision);border-left-color:var(--revision);background:rgba(122,46,134,.06)}
+.rail a.on b{color:var(--revision)}
+.rail__foot{padding:18px 18px 0;margin-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6}
+
+.railtoggle{display:none}
+
+/* ---------- LAYOUT ---------- */
+.wrap{margin-left:var(--rail)}
+.col{max-width:820px;margin:0 auto;padding:0 34px}
+.col--wide{max-width:1080px}
+
+/* ---------- HERO ---------- */
+.hero{
+  border-bottom:1px solid var(--rule-strong);
+  background:
+    linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 60%),
+    var(--paper);
+  padding:54px 0 0;
+}
+.eyebrow{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--contour);margin:0 0 18px;
+}
+h1{
+  font-family:var(--display);font-weight:700;letter-spacing:-.022em;line-height:1.02;
+  font-size:clamp(34px,5.4vw,58px);margin:0 0 18px;
+}
+h1 em{font-style:normal;color:var(--revision)}
+.deck{font-size:19px;line-height:1.55;color:var(--ink-soft);max-width:58ch;margin:0 0 26px}
+.deck b{color:var(--ink);font-weight:600}
+
+.plate{
+  display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:26px;align-items:start;
+  border:1px solid var(--rule-strong);background:var(--card);padding:14px;margin-bottom:0;
+}
+.plate canvas{display:block;width:100%;height:auto;background:#FBFCF9}
+.plate__side{padding:6px 4px 4px}
+.plate__side h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;font-weight:600}
+.swbtn{display:block;width:100%;text-align:left;margin-bottom:6px;padding:7px 9px;border:1px solid var(--rule-strong);background:transparent;cursor:pointer;font-family:var(--display);font-weight:500;font-size:12px;color:var(--ink-soft);transition:.15s}
+.swbtn:hover{border-color:var(--hydro);color:var(--ink)}
+.swbtn[aria-pressed="true"]{background:rgba(31,107,142,.13);color:var(--ink);border-color:var(--hydro);box-shadow:inset 2px 0 0 var(--hydro)}
+.legend{margin-top:16px;font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);line-height:1.9}
+.legend i{display:inline-block;width:11px;height:11px;margin-right:7px;vertical-align:-1px;border-radius:2px}
+.cap{font-family:var(--mono);font-size:11px;color:var(--ink-faint);line-height:1.65;margin:12px 0 0;max-width:66ch}
+
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule-strong);margin-top:36px}
+.meta div{flex:1 1 130px;padding:16px 18px 18px;border-right:1px solid var(--rule)}
+.meta div:last-child{border-right:0}
+.meta span{display:block;font-family:var(--display);font-weight:700;font-size:24px;letter-spacing:-.02em}
+.meta small{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+
+/* ---------- SECTIONS ---------- */
+section{padding:64px 0 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.aulahead{margin-bottom:30px}
+.aulahead .n{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--revision);
+  display:flex;gap:14px;align-items:center;margin-bottom:12px;
+}
+.aulahead .n::after{content:"";flex:1;height:1px;background:var(--rule-strong)}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(25px,3.2vw,34px);letter-spacing:-.018em;line-height:1.14;margin:0 0 12px}
+h3{font-family:var(--display);font-weight:700;font-size:19.5px;letter-spacing:-.008em;margin:42px 0 10px;scroll-margin-top:20px}
+h3 span{font-family:var(--mono);font-weight:500;font-size:13px;color:var(--contour);margin-right:9px}
+h4{font-family:var(--display);font-weight:600;font-size:15.5px;margin:26px 0 8px;letter-spacing:-.003em}
+p{margin:0 0 15px}
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin-bottom:7px}
+li::marker{color:var(--contour)}
+strong{font-weight:600}
+.lede{font-size:18px;line-height:1.55;color:var(--ink-soft);max-width:60ch}
+
+.goals{background:var(--paper-2);border:1px solid var(--rule);padding:18px 22px 14px;margin:0 0 8px}
+.goals h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;font-weight:600}
+.goals ul{margin:0;padding-left:18px;font-size:16px}
+
+/* ---------- CODE ---------- */
+pre{
+  background:#F2F5F0;color:#1B2F36;font-family:var(--mono);font-size:13px;line-height:1.72;
+  padding:16px 18px;overflow-x:auto;margin:0 0 16px;
+  border:1px solid var(--rule);border-left:3px solid var(--hydro);
+}
+pre b{color:#0F5B7E;font-weight:600}       /* palavra-chave */
+pre i{color:#3E6B2F;font-style:normal}     /* texto literal */
+pre u{color:#7C8C91;text-decoration:none}  /* comentário */
+pre em{color:#9A5A17;font-style:normal}    /* número e função */
+code{font-family:var(--mono);font-size:.88em;background:rgba(31,107,142,.10);padding:1px 5px;border-radius:2px}
+.filelabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 6px}
+
+figure.fig{margin:24px 0 28px;border:1px solid var(--rule-strong);background:var(--card);padding:14px 14px 11px}
+figure.fig svg,figure.fig img{display:block;width:100%;height:auto}
+figure.fig figcaption{font-family:var(--body);font-size:14.5px;line-height:1.55;color:var(--ink-soft);margin-top:11px;border-top:1px solid var(--rule);padding-top:10px}
+figure.fig figcaption b{color:var(--ink);font-weight:600}
+figure.fig figcaption code{font-size:.86em}
+.fig--wide{margin-left:-64px;margin-right:-64px}
+@media (max-width:1180px){.fig--wide{margin-left:0;margin-right:0}}
+@media print{figure.fig{page-break-inside:avoid}}
+
+
+
+/* ---------- índice recolhível no mobile ---------- */
+(function(){try{
+  var b=document.getElementById('railtoggle'), r=document.getElementById('rail');
+  if(!b||!r)return;
+  b.addEventListener('click',function(){
+    var ab=r.classList.toggle('aberto');
+    b.setAttribute('aria-expanded',ab); b.textContent=ab?'Fechar':'Índice';
+  });
+  r.addEventListener('click',function(e){ if(e.target.closest('nav a')&&window.innerWidth<=1080){
+    r.classList.remove('aberto'); b.setAttribute('aria-expanded',false); b.textContent='Índice'; }});
+}catch(e){console&&console.warn&&console.warn(e)}})();
+
+/* ---------- botão de copiar código ---------- */
+(function(){
+  document.querySelectorAll('pre').forEach(function(p){
+    var b=document.createElement('button');
+    b.className='copiar'; b.type='button'; b.textContent='copiar';
+    b.addEventListener('click',function(){
+      var t=p.cloneNode(true); var x=t.querySelector('.copiar'); if(x)x.remove();
+      navigator.clipboard.writeText(t.textContent.replace(/^\n/,'')).then(function(){
+        b.textContent='copiado'; setTimeout(function(){b.textContent='copiar'},1400);
+      });
+    });
+    p.appendChild(b);
+  });
+})();
+</script>
+</body>
+</html>/* ---------- botão de copiar código ---------- */
+.codewrap{position:relative;margin:0 0 16px}
+.codewrap pre{margin:0}
+.copybtn{
+  position:absolute;top:8px;right:8px;z-index:2;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-soft);background:rgba(255,255,255,.92);border:1px solid var(--rule-strong);
+  padding:5px 9px;cursor:pointer;opacity:.45;transition:opacity .15s,color .15s,border-color .15s;
+}
+.codewrap:hover .copybtn,.copybtn:focus-visible{opacity:1}
+.copybtn[data-estado]{opacity:1}
+.copybtn:hover{color:var(--hydro);border-color:var(--hydro)}
+.copybtn[data-estado="ok"]{opacity:1;color:var(--veg);border-color:var(--veg)}
+.copybtn[data-estado="erro"]{opacity:1;color:var(--revision);border-color:var(--revision)}
+@media (hover:none){.copybtn{opacity:1}}
+@media print{.copybtn{display:none}}
+
+/* ---------- barra de retorno ao site do curso ---------- */
+.sitebar{
+  position:fixed;inset:0 0 auto 0;height:38px;z-index:60;
+  background:#616161;color:#fff;
+  display:flex;align-items:center;gap:14px;
+  padding:0 18px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+  box-shadow:0 1px 3px rgba(0,0,0,.16);
+}
+.sitebar a{color:#fff;text-decoration:none;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.sitebar a:hover{text-decoration:underline;text-underline-offset:3px}
+.sitebar__sep{opacity:.42}
+.sitebar__ctx{opacity:.80;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitebar__tag{margin-left:auto;border:1px solid rgba(255,255,255,.42);padding:2px 8px;
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.9;white-space:nowrap}
+body{padding-top:38px}
+.rail{top:38px}
+@media (max-width:1080px){ .rail{top:auto} }
+@media (max-width:620px){ .sitebar__ctx,.sitebar__sep{display:none} .sitebar__tag{font-size:8.5px} }
+@media print{ .sitebar{display:none} body{padding-top:0} }
+
+/* ---------- equações ---------- */
+.eqb{margin:20px 0;text-align:center;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+.eqb .eqd{display:inline-block;max-width:100%;height:auto;vertical-align:middle}
+.eqi{margin:0 .08em}
+@media (max-width:560px){.eqb{margin:16px -8px}}
+
+/* ---------- CALLOUTS ---------- */
+.box{border:1px solid var(--rule-strong);border-left-width:3px;padding:15px 19px 12px;margin:20px 0;background:var(--card);font-size:16px}
+.box h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 8px;font-weight:600}
+.box p:last-child,.box ul:last-child{margin-bottom:0}
+.box--obs{border-left-color:var(--veg)} .box--obs h5{color:var(--veg)}
+.box--trap{border-left-color:var(--revision)} .box--trap h5{color:var(--revision)}
+.box--note{border-left-color:var(--hydro)} .box--note h5{color:var(--hydro)}
+
+/* ---------- TABLES ---------- */
+.tw{overflow-x:auto;margin:18px 0 22px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-family:var(--mono)}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap}
+thead th{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--rule-strong);font-weight:600}
+tbody tr:hover{background:rgba(31,107,142,.05)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.txt{font-family:var(--body);font-size:15px;line-height:1.55}
+table.txt td{white-space:normal;vertical-align:top}
+caption{caption-side:bottom;text-align:left;font-family:var(--mono);font-size:11px;color:var(--ink-faint);padding-top:9px;line-height:1.6}
+
+/* heatmap */
+table.heat td{text-align:center;padding:8px 6px;border:1px solid rgba(255,255,255,.55);font-size:12.5px;font-weight:500;white-space:nowrap}
+table.heat th{font-size:10px;letter-spacing:.04em;text-transform:none;color:var(--ink-soft);font-weight:500;white-space:nowrap}
+table.heat thead th{writing-mode:vertical-rl;transform:rotate(180deg);padding:6px 3px;text-align:left}
+table.heat thead th:first-child{writing-mode:horizontal-tb;transform:none}
+
+/* ---------- EXERCISES ---------- */
+.exwrap{margin:34px 0 10px;border-top:2px solid var(--ink);padding-top:20px}
+.exwrap > h4{margin-top:0;font-size:13px;font-family:var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.ex{border-left:2.5px solid var(--revision);padding:2px 0 2px 18px;margin:0 0 24px}
+.ex__t{font-family:var(--display);font-weight:600;font-size:15.5px;letter-spacing:-.003em;margin:0 0 7px}
+.ex__t b{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--revision);margin-right:8px}
+.ex p{font-size:16px}
+.tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;border:1px solid var(--rule-strong);padding:2px 7px;margin-left:8px;color:var(--ink-faint);vertical-align:2px}
+details{margin-top:10px;border-top:1px dashed var(--rule-strong);padding-top:9px}
+summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hydro);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";font-size:11px}
+details[open] summary::before{content:"▾ "}
+details > div{padding-top:10px;font-size:16px}
+details pre{font-size:12.2px}
+
+.top{display:block;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none;margin:38px 0 0;padding-bottom:6px}
+.top:hover{color:var(--revision)}
+
+footer{margin-top:60px;border-top:1px solid var(--rule-strong);background:var(--paper-2);padding:36px 0 60px}
+footer .col{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.85}
+
+@media (max-width:1080px){
+  :root{--rail:0px}
+  .rail{position:static;width:auto;border-right:0;border-bottom:1px solid var(--rule-strong)}
+  .rail nav{display:none;max-width:820px;margin:0 auto;padding:8px 20px 16px}
+  .rail nav.open{display:block}
+  .rail__brand{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 34px 14px}
+  .railtoggle{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--rule-strong);background:transparent;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  .rail a{padding:5px 0}
+  .rail__foot{display:none}
+  .plate{grid-template-columns:1fr}
+  .col{padding:0 22px}
+}
+@media (max-width:560px){
+  body{font-size:16px}
+  .col{padding:0 16px}
+  .meta div{flex:1 1 50%;border-bottom:1px solid var(--rule)}
+}
+@media print{
+  .rail,.plate__side,.top{display:none}
+  .wrap{margin-left:0}
+  body{background:#fff;font-size:11pt}
+  pre{background:#F5F6F3;color:#111;border-color:#ccc;border-left-color:#888}
+  section{page-break-inside:auto;border-top:1px solid #ccc}
+  details{display:block}
+  details > div{display:block!important}
+}
+.eqb .eqd{color:var(--ink)}
+.eqi{margin:0 .1em;color:var(--ink)}
+
+/* ---------- BANCADA: painéis dos simuladores ---------- */
+/* ---------- BANCADA (painel de demo) ---------- */
+.bancada{background:var(--card);border:1px solid var(--rule);border-radius:5px;margin:1.8rem 0;overflow:hidden}
+.bc-top{display:flex;align-items:center;gap:12px;background:var(--paper-2);border-bottom:1px solid var(--rule);padding:8px 14px;flex-wrap:wrap}
+.bc-id{font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--hydro)}
+.bc-tt{font-family:var(--mono);font-size:11px;color:var(--ink-soft);flex:1;min-width:150px}
+.bc-read{font-family:var(--mono);font-size:11px;color:var(--ink);white-space:nowrap}
+.bc-body{padding:14px}
+canvas{display:block;width:100%;border-radius:3px;background:var(--card);touch-action:none}
+.ctrl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--ink-soft)}
+.ctrl label{display:flex;align-items:center;gap:7px}
+.ctrl input[type=range]{width:120px;accent-color:var(--hydro)}
+.ctrl select{background:var(--paper-2);color:var(--ink);border:1px solid var(--rule);font-family:var(--mono);font-size:11px;padding:4px 6px;border-radius:3px}
+button{font-family:var(--mono);font-size:11px;letter-spacing:.08em;background:var(--paper-2);color:var(--ink);border:1px solid var(--rule);padding:6px 12px;border-radius:3px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--hydro);color:var(--ink)}
+button.pri{background:var(--hydro);color:var(--card);border-color:var(--hydro);font-weight:600}
+button.pri:hover{filter:brightness(1.12)}
+.val{color:var(--ink);min-width:38px;display:inline-block}
+.leg{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:9px;line-height:1.6}
+.leg b{color:var(--ink-soft);font-weight:400}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:4px}
+
+/* ---------- EXERCÍCIOS ---------- */
+.ex{border:1px solid var(--rule);border-left:2px solid var(--revision);background:var(--card);padding:15px 18px;margin:1.4rem 0;border-radius:4px}
+.ex .hd{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--revision);margin-bottom:.5rem}
+.ex .hd span{color:var(--ink-faint);float:right;letter-spacing:.08em}
+.resp{margin-top:.9rem}
+.resp>summary{font-family:var(--mono);font-size:11px;color:var(--ink-faint);cursor:pointer;list-style:none;padding:5px 0;border-top:1px dashed var(--rule)}
+.resp>summary::before{content:"▸ ";color:var(--revision)}
+.resp[open]>summary::before{content:"▾ "}
+.resp>summary:hover{color:var(--ink)}
+.resp .in{background:var(--paper-2);border:1px solid var(--rule);padding:11px 14px;border-radius:3px;font-size:14.5px}
+pre{position:relative;background:var(--code);border:1px solid var(--rule);border-radius:3px;padding:15px 17px;overflow-x:auto;font-family:var(--mono);font-size:12.8px;line-height:1.62;color:var(--ink);max-width:none;margin:1.1rem 0}
+.video{position:relative;width:100%;aspect-ratio:16/9;background:var(--video) center/cover no-repeat;border:1px solid var(--rule);border-radius:4px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.video.noimg{background:linear-gradient(135deg,var(--paper-2) 0%,var(--card) 100%)}
+.video::before{content:"";position:absolute;inset:0;z-index:1;transition:opacity .2s;background:linear-gradient(180deg,rgba(5,8,11,.20) 0%,rgba(5,8,11,.02) 42%,rgba(5,8,11,.78) 100%)}
+.video:hover::before{opacity:.6}
+.video.on::before{display:none}
+.ytplay{position:relative;z-index:2;width:76px;height:53px;border-radius:13px;background:#FF0033;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 6px 22px rgba(0,0,0,.5);transition:transform .16s,background .16s}
+.video:hover .ytplay{transform:scale(1.09);background:#FF0000}
+.ytplay:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.ytplay svg{width:23px;height:23px;fill:#fff;margin-left:3px}
+.ytmeta{position:absolute;left:15px;right:15px;bottom:12px;z-index:2;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none}
+.ytmeta b{font-family:var(--display);font-size:13.5px;color:#fff;font-weight:600;line-height:1.3;text-shadow:0 1px 5px rgba(0,0,0,.95)}
+.ytmeta span{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.78);white-space:nowrap;text-shadow:0 1px 5px rgba(0,0,0,.95)}
+.video.on .ytmeta{display:none}
+.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;z-index:3}
+@media(max-width:520px){.ytplay{width:60px;height:42px}.ytplay svg{width:18px;height:18px}.ytmeta b{font-size:12px}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.grid2{grid-template-columns:1fr}}
+@media print{body{background:#fff;color:#000}}
+
+
+/* ---------- blocos de equação ---------- */
+.eq{
+  margin:24px 0;padding:18px 20px;background:var(--paper-2);
+  border-left:2px solid var(--hydro);overflow-x:auto;overflow-y:hidden;
+}
+.eq .eqd{display:block;margin:0 auto;max-width:100%;height:auto;color:var(--ink)}
+.eq .eqd + .eqd{margin-top:15px}
+.eq > em{
+  display:block;margin-top:16px;padding-top:13px;border-top:1px solid var(--rule);
+  font-family:var(--body);font-style:italic;font-size:14.5px;line-height:1.62;color:var(--ink-soft);
+}
+.eq > em em{display:inline;margin:0;padding:0;border:0;font-size:inherit;font-style:normal;font-weight:600}
+@media (max-width:560px){.eq{padding:14px 12px;margin:20px -12px}}
+
+.resp .in{overflow-x:auto;overflow-y:hidden}
+.resp .in .eqd{display:block;margin:11px auto;color:var(--ink)}
+.resp .in > p{margin:0 0 4px}
+.resp .in > p + .eqd{margin-top:6px}
+.resp .in .box{margin:16px 0 10px}
+
+/* ---------- matrizes numéricas compactas ---------- */
+.matpar{display:flex;gap:14px 30px;flex-wrap:wrap;align-items:flex-start;justify-content:center;margin:20px 0 24px;overflow-x:auto}
+.matpar figure{margin:0}
+.matpar figcaption{font-family:var(--mono);font-size:10px;letter-spacing:.13em;text-transform:uppercase;
+                   color:var(--ink-faint);margin:0 0 7px;font-weight:600}
+table.mat{width:auto;border-collapse:collapse;font-family:var(--mono);font-size:13px;
+          font-variant-numeric:tabular-nums;background:var(--paper-2)}
+table.mat th,table.mat td{padding:4px 11px;text-align:right;white-space:nowrap;border:0;border-bottom:1px solid var(--rule)}
+table.mat thead th{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+                   border-bottom:1px solid var(--rule-strong);font-weight:600;padding-bottom:6px}
+table.mat tbody td:first-child,table.mat thead th:first-child{
+  text-align:left;color:var(--ink-faint);font-size:11px;border-right:1px solid var(--rule);padding-right:13px}
+table.mat tbody tr:hover{background:rgba(31,107,142,.07)}
+table.mat tbody tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+table.mat tfoot td{border-bottom:0;padding-top:7px;color:var(--hydro);font-weight:600}
+table.mat tfoot td:first-child{text-align:left;color:var(--hydro);font-size:11px}
+table.mat tfoot tr.zero td{color:var(--veg)}
+@media (max-width:620px){table.mat{font-size:12px} table.mat th,table.mat td{padding:3px 8px}}
+
+table.mat td.hl,table.mat th.hl{background:rgba(31,107,142,.11)}
+table.mat tfoot tr.lam td{color:var(--contour);border-top:1px solid var(--rule-strong)}
+table.mat tfoot tr.pct td{color:var(--ink-faint);font-weight:400;font-size:11.5px;padding-top:2px}
+
+/* ---------- cabeçalho e controles das bancadas ---------- */
+.leg{font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);margin-top:9px;line-height:1.6}
+.leg b{color:var(--ink-soft);font-weight:400}
+</style>
+</head>
+<body>
+<script>
+/* Navegação interna resistente a iframe: resolve o alvo pelo id, sem depender da URL. */
+window.__ir=function(a){
+  var id=(a.getAttribute('href')||'').replace(/^.*#/,'');
+  if(!id){window.scrollTo({top:0,behavior:'smooth'});return false}
+  var el=document.getElementById(id);
+  if(el){el.scrollIntoView({behavior:'smooth',block:'start'});return false}
+  return true;
+};
+
+</script><div class="sitebar"><a href="https://insper.github.io/ML/pt/2026.2/classes/">&#8592; Machine Learning · Insper</a><span class="sitebar__sep">/</span><span class="sitebar__ctx">Laboratório avançado · vinhos</span><span class="sitebar__tag">Sozinho ou em dupla</span></div>
+<aside class="rail" id="rail">
+  <div class="rail__brand">
+    <div>
+      <span class="rail__mark">Insper · Machine Learning</span>
+      <p class="rail__title">Agrupar<br>178 vinhos</p>
+      <p class="rail__sub">Avançado · 2h30 · 9 etapas</p>
+    </div>
+    <button class="railtoggle" id="railtoggle" aria-expanded="false">Índice</button>
+  </div>
+  <nav>
+    <h4>Sem o gabarito</h4>
+    <a href="#w0" onclick="return __ir(this)"><b>0</b><span>O terreno</span></a>
+    <a href="#w1" onclick="return __ir(this)"><b>1</b><span>Cinco escalas</span></a>
+    <a href="#w2" onclick="return __ir(this)"><b>2</b><span>k · quatro índices e o gap</span></a>
+    <a href="#w3" onclick="return __ir(this)"><b>3</b><span>Estabilidade</span></a>
+    <a href="#w4" onclick="return __ir(this)"><b>4</b><span>Ler a partição</span></a>
+    <a href="#w5" onclick="return __ir(this)"><b>5</b><span>GMM, covariância e BIC</span></a>
+    <a href="#w6" onclick="return __ir(this)"><b>6</b><span>Agrupar no espaço PCA</span></a>
+    <h4>Conferir</h4>
+    <a href="#w7" onclick="return __ir(this)"><b>7</b><span>Auditar as decisões</span></a>
+    <a href="#w8" onclick="return __ir(this)"><b>8</b><span>Régua e desafios</span></a>
+  </nav>
+  <div class="rail__foot">
+    178 vinhos · 13 medidas<br>5 escalas · 5 índices · 4 algoritmos<br>Números todos por execução
+  </div>
+</aside>
+
+<div class="wrap">
+<header class="hero">
+  <div class="col col--wide">
+    <p class="eyebrow">Laboratório avançado · Machine Learning</p>
+    <h1>Cinco critérios,<br>e três deles<br>apontam errado.</h1>
+    <p class="deck">Nove etapas para fazer sozinho ou em dupla. Você vai comparar cinco transformações de escala, quatro índices internos, implementar a estatística gap do zero, medir estabilidade por reamostragem e selecionar modelo por BIC — para descobrir, na etapa 7, quais desses instrumentos o levaram à resposta errada e por quê.</p>
+    <div class="meta">
+      <div><span>178</span><small>Vinhos</small></div>
+      <div><span>13</span><small>Medidas químicas</small></div>
+      <div><span>5</span><small>Critérios de seleção</small></div>
+      <div><span>9</span><small>Etapas</small></div>
+      <div><span>2h30</span><small>Duração</small></div>
+    </div>
+  </div>
+</header>
+
+<main class="col">
+
+<section id="w0">
+  <div class="aulahead"><p class="n">Etapa 0 · 10 min</p><h2>O terreno, e a regra do laboratório</h2></div>
+
+  <p>Este laboratório é <strong>para fazer sozinho ou em dupla</strong>, em duas sessões se preciso. Ele vai bem além do roteiro de aula: você vai comparar <strong>cinco transformações de escala</strong>, <strong>quatro índices internos</strong>, implementar a <strong>estatística gap</strong> do zero, medir <strong>estabilidade por reamostragem</strong> e selecionar modelo por <strong>BIC</strong>.</p>
+  <p>O conjunto: <strong>178 vinhos italianos</strong> de três cultivares, com <strong>13 medidas químicas</strong>. Vem embutido no scikit-learn — não há download para falhar.</p>
+
+<pre><b>import</b> numpy <b>as</b> np, pandas <b>as</b> pd, matplotlib.pyplot <b>as</b> plt
+<b>from</b> sklearn.datasets <b>import</b> load_wine
+
+w  = load_wine(as_frame=<b>True</b>)
+df = w.frame
+F  = w.feature_names
+
+df.shape                                   <u># (178, 14)</u>
+df.isna().sum().sum()                      <u># 0</u>
+df[F].std().describe()[[<i>"min"</i>,<i>"max"</i>]].round(<em>3</em>)   <u># 0.124  e  314.907</u></pre>
+
+  <p class="cap"><strong>Verificação:</strong> o maior desvio padrão é <strong>2.530 vezes</strong> o menor. Guarde.</p>
+
+  <div class="box box--trap">
+    <h5>A coluna <code>target</code> fica lacrada até a etapa 7</h5>
+    <p>Ela traz a cultivar verdadeira. <strong>Não olhe, não use, não colora gráfico com ela</strong> antes da etapa 7. Todas as decisões — escala, k, algoritmo — têm de ser tomadas com os instrumentos que existem quando não há gabarito.</p>
+    <p>Um agrupamento com gabarito é um luxo raro. O objetivo aqui é usá-lo para <strong>auditar seus próprios critérios</strong>, não para guiá-los.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w1">
+  <div class="aulahead"><p class="n">Etapa 1 · 25 min</p><h2>Cinco escalas, e o que os índices dizem sobre elas</h2></div>
+
+  <p>Padronizar não é uma decisão binária. Compare cinco tratamentos, medindo os três índices internos usuais.</p>
+
+<pre><b>from</b> sklearn.preprocessing <b>import</b> (StandardScaler, RobustScaler, MinMaxScaler,
+                                   PowerTransformer, QuantileTransformer)
+<b>from</b> sklearn.cluster <b>import</b> KMeans
+<b>from</b> sklearn.metrics <b>import</b> (silhouette_score, calinski_harabasz_score,
+                             davies_bouldin_score)
+
+X = df[F].values
+esc = {
+    <i>"nenhum"</i>:              <b>None</b>,
+    <i>"StandardScaler"</i>:      StandardScaler(),
+    <i>"RobustScaler"</i>:        RobustScaler(),
+    <i>"MinMaxScaler"</i>:        MinMaxScaler(),
+    <i>"PowerTransformer"</i>:    PowerTransformer(),
+    <i>"QuantileTransformer"</i>: QuantileTransformer(output_distribution=<i>"normal"</i>,
+                                                 n_quantiles=<em>100</em>, random_state=<em>0</em>),
+}
+<b>for</b> nome, e <b>in</b> esc.items():
+    M = X <b>if</b> e <b>is</b> <b>None</b> <b>else</b> e.fit_transform(X)
+    l = KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(M)
+    <b>print</b>(<b>f</b><i>"{nome:20s} sil {silhouette_score(M,l):.3f}  "</i>
+          <b>f</b><i>"CH {calinski_harabasz_score(M,l):7.1f}  DB {davies_bouldin_score(M,l):.3f}"</i>)</pre>
+
+  <div class="matpar">
+    <figure><figcaption>três índices internos, cinco escalas</figcaption>
+    <table class="mat">
+      <thead><tr><th>tratamento</th><th>silhueta ↑</th><th>Calinski-H. ↑</th><th>Davies-B. ↓</th></tr></thead>
+      <tbody>
+        <tr><td>nenhum</td><td class="hl">0,571</td><td class="hl">561,8</td><td class="hl">0,534</td></tr>
+        <tr><td>StandardScaler</td><td>0,285</td><td>70,9</td><td>1,389</td></tr>
+        <tr><td>RobustScaler</td><td>0,264</td><td>61,1</td><td>1,466</td></tr>
+        <tr><td>MinMaxScaler</td><td>0,301</td><td>83,4</td><td>1,305</td></tr>
+        <tr><td>PowerTransformer</td><td>0,301</td><td>73,1</td><td>1,361</td></tr>
+        <tr><td>QuantileTransformer</td><td>0,250</td><td>51,6</td><td>1,538</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--trap">
+    <h5>Os três índices concordam — e os três apontam para a mesma resposta errada</h5>
+    <p>A silhueta é <strong>máxima</strong> sem escalar. O Calinski-Harabasz é <strong>oito vezes maior</strong> sem escalar. O Davies-Bouldin, que se quer <em>baixo</em>, é <strong>2,6 vezes menor</strong> sem escalar. Três instrumentos independentes, unânimes.</p>
+    <p>E os três estão errados, como a etapa 7 vai mostrar. O motivo é comum aos três: <strong>todos medem separação geométrica no espaço em que você os aplicou</strong>. Sem escalar, esse espaço é essencialmente o eixo <code>proline</code>, e faixas de <code>proline</code> são de fato muito bem separadas.</p>
+    <p><strong>A lição:</strong> índices internos servem para comparar <em>partições do mesmo espaço</em>. Comparar espaços diferentes com eles é uma inversão — o índice muda porque a régua mudou, não porque a partição melhorou.</p>
+  </div>
+
+  <p class="cap"><strong>Responda antes de seguir:</strong> se os índices não podem escolher a escala, o que pode? Anote sua resposta; a etapa 3 oferece uma.</p>
+
+  <p>Siga com o <code>StandardScaler</code>. Ele não é o melhor por nenhum índice, e é a escolha certa pelas razões da aula.</p>
+<pre>Z = StandardScaler().fit_transform(X)</pre>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w2">
+  <div class="aulahead"><p class="n">Etapa 2 · 30 min</p><h2>Escolher k com quatro instrumentos — e um quinto, feito à mão</h2></div>
+
+  <h4>2a · Os quatro índices por k</h4>
+<pre><b>for</b> k <b>in</b> <b>range</b>(<em>2</em>, <em>9</em>):
+    m = KMeans(k, n_init=<em>20</em>, random_state=<em>0</em>).fit(Z)
+    <b>print</b>(k, <b>round</b>(m.inertia_,<em>1</em>), <b>round</b>(silhouette_score(Z,m.labels_),<em>4</em>),
+             <b>round</b>(calinski_harabasz_score(Z,m.labels_),<em>1</em>),
+             <b>round</b>(davies_bouldin_score(Z,m.labels_),<em>4</em>))</pre>
+
+  <div class="matpar">
+    <figure><figcaption>quatro índices em função de k</figcaption>
+    <table class="mat">
+      <thead><tr><th>k</th><th>inércia ↓</th><th>silhueta ↑</th><th>CH ↑</th><th>DB ↓</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>1659,0</td><td>0,2683</td><td>69,5</td><td>1,4482</td></tr>
+        <tr><td>3</td><td>1277,9</td><td class="hl">0,2849</td><td class="hl">70,9</td><td class="hl">1,3892</td></tr>
+        <tr><td>4</td><td>1180,7</td><td>0,2457</td><td>55,7</td><td>1,7653</td></tr>
+        <tr><td>5</td><td>1108,5</td><td>0,2451</td><td>47,0</td><td>1,7360</td></tr>
+        <tr><td>6</td><td>1044,5</td><td>0,1960</td><td>41,8</td><td>1,8123</td></tr>
+        <tr><td>7</td><td>987,0</td><td>0,1802</td><td>38,3</td><td>1,8040</td></tr>
+        <tr><td>8</td><td>944,6</td><td>0,1581</td><td>35,2</td><td>1,7692</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <p>Os três índices comparáveis apontam <strong>k = 3</strong>. Note também que a diferença entre k=2 e k=3 na silhueta é de apenas <strong>0,0166</strong> — uma margem estreita, à qual voltaremos.</p>
+
+  <h4>2b · A estatística gap, implementada do zero</h4>
+  <p>A ideia de Tibshirani, Walther e Hastie (2001): a inércia sempre cai, então compare a queda observada com <strong>a queda que se obteria em dados sem estrutura</strong>, gerados uniformemente na mesma caixa. O <em>gap</em> é a diferença entre os dois, em escala logarítmica.</p>
+
+<pre>rng = np.random.default_rng(<em>0</em>)
+B   = <em>20</em>                       <u># referências uniformes por k</u>
+lo, hi = Z.min(axis=<em>0</em>), Z.max(axis=<em>0</em>)
+
+<b>def</b> W(M, k, seed=<em>0</em>):
+    <b>return</b> KMeans(k, n_init=<em>10</em>, random_state=seed).fit(M).inertia_
+
+gaps, sks = [], []
+<b>for</b> k <b>in</b> <b>range</b>(<em>1</em>, <em>9</em>):
+    logW  = np.log(W(Z, k))
+    refs  = [np.log(W(rng.uniform(lo, hi, Z.shape), k)) <b>for</b> _ <b>in</b> <b>range</b>(B)]
+    gap   = np.mean(refs) - logW
+    sk    = np.std(refs) * np.sqrt(<em>1</em> + <em>1</em>/B)      <u># erro padrão corrigido</u>
+    gaps.append(gap); sks.append(sk)
+    <b>print</b>(k, <b>round</b>(logW,<em>4</em>), <b>round</b>(gap,<em>4</em>), <b>round</b>(sk,<em>4</em>))
+
+<u># critério: o menor k tal que gap(k) &gt;= gap(k+1) - s(k+1)</u>
+escolha = <b>next</b>(k <b>for</b> k <b>in</b> <b>range</b>(<em>1</em>, <em>8</em>) <b>if</b> gaps[k-<em>1</em>] &gt;= gaps[k] - sks[k])
+<b>print</b>(<i>"gap escolhe k ="</i>, escolha)   <u># 3</u></pre>
+
+  <div class="matpar">
+    <figure><figcaption>gap por k</figcaption>
+    <table class="mat">
+      <thead><tr><th>k</th><th>log W</th><th>E[log W*]</th><th>gap</th><th>s(k)</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>7,7467</td><td>8,5370</td><td>0,7903</td><td>0,0159</td></tr>
+        <tr><td>2</td><td>7,4140</td><td>8,4260</td><td>1,0120</td><td>0,0200</td></tr>
+        <tr><td>3</td><td>7,1530</td><td>8,3518</td><td class="hl">1,1988</td><td>0,0230</td></tr>
+        <tr><td>4</td><td>7,0739</td><td>8,2874</td><td>1,2135</td><td>0,0234</td></tr>
+        <tr><td>5</td><td>7,0124</td><td>8,2465</td><td>1,2341</td><td>0,0216</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--obs">
+    <h5>Por que o critério não é "onde o gap é máximo"</h5>
+    <p>O gap continua subindo até k=8 (1,3021). Tomar o máximo daria k=8. O critério correto é <strong>o primeiro k em que o gap já não melhora de forma significativa</strong> — formalmente, o menor k com <code>gap(k) ≥ gap(k+1) − s(k+1)</code>.</p>
+    <p>Aqui: gap(3) = 1,1988 e gap(4) − s(4) = 1,2135 − 0,0234 = 1,1901. Como 1,1988 ≥ 1,1901, <strong>o critério para em k = 3</strong>.</p>
+    <p>Repare no que o gap acrescenta aos outros índices: ele é o único que compara o resultado com <strong>uma hipótese nula explícita</strong> — dados sem estrutura na mesma caixa. É a formalização da "régua do ruído" da aula.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w3">
+  <div class="aulahead"><p class="n">Etapa 3 · 25 min</p><h2>Estabilidade: o critério que não olha a geometria</h2></div>
+
+  <p>Todos os índices até aqui medem <em>forma</em>. Há um critério ortogonal a eles: <strong>se os grupos são reais, devem reaparecer quando você reamostra os dados</strong>. Se dependem do sorteio, não são estrutura.</p>
+
+<pre><b>from</b> sklearn.metrics <b>import</b> adjusted_rand_score
+
+rng = np.random.default_rng(<em>0</em>)
+
+<b>def</b> estabilidade(Z, k, B=<em>30</em>, frac=<em>0.8</em>):
+    n, labs, idxs = <b>len</b>(Z), [], []
+    <b>for</b> b <b>in</b> <b>range</b>(B):
+        idx = rng.choice(n, <b>int</b>(frac*n), replace=<b>False</b>)
+        labs.append(KMeans(k, n_init=<em>10</em>, random_state=b).fit_predict(Z[idx]))
+        idxs.append(idx)
+    vals = []
+    <b>for</b> a <b>in</b> <b>range</b>(B):
+        <b>for</b> c <b>in</b> <b>range</b>(a+<em>1</em>, B):
+            com = np.intersect1d(idxs[a], idxs[c])          <u># pontos nas duas amostras</u>
+            <b>if</b> <b>len</b>(com) &lt; <em>20</em>: <b>continue</b>
+            pa = labs[a][[<b>list</b>(idxs[a]).index(x) <b>for</b> x <b>in</b> com]]
+            pc = labs[c][[<b>list</b>(idxs[c]).index(x) <b>for</b> x <b>in</b> com]]
+            vals.append(adjusted_rand_score(pa, pc))         <u># concordam entre si?</u>
+    <b>return</b> np.mean(vals), np.std(vals)
+
+<b>for</b> k <b>in</b> <b>range</b>(<em>2</em>, <em>8</em>):
+    m, s = estabilidade(Z, k)
+    <b>print</b>(k, <b>round</b>(m, <em>4</em>), <b>round</b>(s, <em>4</em>))</pre>
+
+  <div class="matpar">
+    <figure><figcaption>concordância entre partições de subamostras</figcaption>
+    <table class="mat">
+      <thead><tr><th>k</th><th>ARI médio entre pares</th><th>desvio</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>0,7059</td><td class="hl">0,2755</td></tr>
+        <tr><td>3</td><td class="hl">0,9544</td><td>0,0382</td></tr>
+        <tr><td>4</td><td>0,8179</td><td>0,0994</td></tr>
+        <tr><td>5</td><td>0,7329</td><td>0,0987</td></tr>
+        <tr><td>6</td><td>0,6617</td><td>0,0995</td></tr>
+        <tr><td>7</td><td>0,5989</td><td>0,1076</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--obs">
+    <h5>Este é o instrumento mais decisivo do laboratório</h5>
+    <p>Em <strong>k = 3</strong>, duas subamostras de 80% concordam com ARI <strong>0,954</strong>, e o desvio é de apenas 0,038 — praticamente sempre a mesma partição.</p>
+    <p>Em <strong>k = 2</strong>, a média cai para 0,706 e o <strong>desvio explode para 0,276</strong>. Ou seja: dependendo de quais 80% você sortear, a partição em dois grupos muda radicalmente. Lembre que na etapa 2 a silhueta separava k=2 de k=3 por meros 0,0166. <strong>A estabilidade separa os dois de forma inequívoca</strong>, e na direção certa.</p>
+    <p>É um critério com uma vantagem conceitual: <strong>ele não pressupõe nenhuma forma de grupo</strong>. Funciona igual para k-means, GMM ou qualquer outro método, e responde a uma pergunta que nenhum índice geométrico responde — "isto se repete?".</p>
+  </div>
+
+  <p class="cap"><strong>Responda:</strong> volte à pergunta da etapa 1. Você poderia usar estabilidade para escolher a <em>escala</em>? O que precisaria mudar no procedimento?</p>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w4">
+  <div class="aulahead"><p class="n">Etapa 4 · 20 min</p><h2>Ler a partição: silhueta por ponto e perfil dos centróides</h2></div>
+
+  <h4>4a · O diagrama de silhueta</h4>
+<pre><b>from</b> sklearn.metrics <b>import</b> silhouette_samples
+
+km = KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit(Z)
+l  = km.labels_
+s  = silhouette_samples(Z, l)
+
+<b>for</b> j <b>in</b> <b>range</b>(<em>3</em>):
+    <b>print</b>(j, (l==j).sum(), <b>round</b>(s[l==j].mean(),<em>3</em>), <b>round</b>((s[l==j]&lt;<em>0</em>).mean()*<em>100</em>,<em>1</em>))
+<u># 0  65  0.177  10.8</u>
+<u># 1  51  0.351   0.0</u>
+<u># 2  62  0.343   0.0</u></pre>
+
+  <p>Um grupo tem metade da coesão dos outros e <strong>7 pontos negativos</strong>. Guarde a hipótese: ele é um grupo mal formado, ou apenas um grupo disperso?</p>
+
+  <h4>4b · O que caracteriza cada grupo, em unidades originais</h4>
+  <p>Centróides padronizados não se interpretam. Desfaça a transformação:</p>
+
+<pre>sc  = StandardScaler().fit(X)
+Z   = sc.transform(X)
+km  = KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit(Z)
+cen = sc.inverse_transform(km.cluster_centers_)      <u># de volta às unidades reais</u>
+pd.DataFrame(cen, columns=F).round(<em>2</em>)</pre>
+
+  <div class="matpar">
+    <figure><figcaption>perfil dos centróides (cinco das treze colunas)</figcaption>
+    <table class="mat">
+      <thead><tr><th>grupo</th><th>álcool</th><th>flavonoides</th><th>cor</th><th>prolina</th><th>OD280</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>12,25</td><td>2,05</td><td>2,97</td><td>510</td><td>2,80</td></tr>
+        <tr><td>1</td><td>13,13</td><td class="hl">0,82</td><td class="hl">7,23</td><td>619</td><td class="hl">1,70</td></tr>
+        <tr><td>2</td><td>13,68</td><td>3,00</td><td>5,45</td><td class="hl">1100</td><td>3,16</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <p>Agora os grupos têm descrição: o <strong>1</strong> é o vinho de cor intensa e poucos flavonoides; o <strong>2</strong> é o de prolina alta e mais alcoólico; o <strong>0</strong> é o mais leve em tudo.</p>
+
+  <h4>4c · Quais variáveis fizeram o trabalho</h4>
+<pre><b>from</b> scipy.stats <b>import</b> f_oneway
+Fs = {c: f_oneway(*[Z[l==j, i] <b>for</b> j <b>in</b> <b>range</b>(<em>3</em>)])[<em>0</em>] <b>for</b> i, c <b>in</b> <b>enumerate</b>(F)}
+<b>sorted</b>(Fs.items(), key=<b>lambda</b> x: -x[<em>1</em>])[:<em>5</em>]</pre>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th>mais discriminantes</th><th class="num">F</th><th>menos discriminantes</th><th class="num">F</th></tr></thead>
+    <tbody>
+      <tr><td><code>flavanoids</code></td><td class="num">271,6</td><td><code>ash</code></td><td class="num">14,9</td></tr>
+      <tr><td><code>od280/od315</code></td><td class="num">221,5</td><td><code>magnesium</code></td><td class="num">22,7</td></tr>
+      <tr><td><code>proline</code></td><td class="num">200,3</td><td><code>alcalinity_of_ash</code></td><td class="num">24,5</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="box box--trap">
+    <h5>Cuidado com o que esse F significa</h5>
+    <p>Ele foi calculado com os <strong>rótulos que o próprio k-means produziu</strong>. Não é um teste de hipótese válido — os grupos foram construídos para maximizar separação, então F alto é esperado por construção. O valor-p aqui <strong>não tem interpretação</strong>.</p>
+    <p>O que a lista serve para: <strong>ordenar</strong> as variáveis por contribuição à partição encontrada, como descrição. Nunca como evidência de que a variável "difere entre os grupos" no sentido inferencial.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w5">
+  <div class="aulahead"><p class="n">Etapa 5 · 25 min</p><h2>Modelo probabilístico: GMM, covariância e BIC</h2></div>
+
+  <p>O k-means assume grupos esféricos de tamanho parecido. A mistura de gaussianas relaxa isso: cada componente tem <strong>média e covariância próprias</strong>, e cada ponto recebe uma <em>probabilidade</em> de pertencer a cada grupo. O preço é o número de parâmetros — e é aí que entra o BIC.</p>
+
+<pre><b>from</b> sklearn.mixture <b>import</b> GaussianMixture
+
+<b>for</b> tipo <b>in</b> [<i>"full"</i>, <i>"tied"</i>, <i>"diag"</i>, <i>"spherical"</i>]:
+    <b>for</b> k <b>in</b> <b>range</b>(<em>2</em>, <em>7</em>):
+        g = GaussianMixture(k, covariance_type=tipo, random_state=<em>0</em>, n_init=<em>5</em>).fit(Z)
+        <b>print</b>(tipo, k, <b>round</b>(g.bic(Z), <em>1</em>), <b>round</b>(g.aic(Z), <em>1</em>))</pre>
+
+  <div class="matpar">
+    <figure><figcaption>BIC por tipo de covariância e k (menor é melhor)</figcaption>
+    <table class="mat">
+      <thead><tr><th>tipo</th><th>k = 2</th><th>k = 3</th><th>k = 4</th></tr></thead>
+      <tbody>
+        <tr><td>full</td><td>5608,3</td><td>5806,3</td><td>5670,2</td></tr>
+        <tr><td>tied</td><td>5643,3</td><td>5572,6</td><td>5545,3</td></tr>
+        <tr><td>diag</td><td>5987,9</td><td>5543,4</td><td class="hl">5476,5</td></tr>
+        <tr><td>spherical</td><td>6135,0</td><td>5708,8</td><td>5654,9</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--trap">
+    <h5>O menor BIC aponta <code>diag</code> com k = 4. E erra.</h5>
+    <p>O BIC mínimo de toda a tabela é <strong>5476,5</strong>, em <code>covariance_type="diag"</code> com <strong>k = 4</strong>. Seguindo o critério, essa seria a escolha.</p>
+    <p>Na etapa 7 você verá que essa configuração dá ARI <strong>0,683</strong>, enquanto <code>tied</code> com k = 3 dá <strong>0,912</strong> — o melhor resultado de todo o laboratório.</p>
+    <p>Por quê: o BIC otimiza <strong>verossimilhança penalizada por número de parâmetros</strong>. Com 178 pontos em 13 dimensões, ele prefere modelos mais simples por componente e compensa com mais componentes. <strong>Descrever bem a densidade dos dados e recuperar os grupos que nos interessam são objetivos diferentes.</strong></p>
+    <p>Compare com a etapa 3: a estabilidade apontou k=3 sem ambiguidade. Vale rodar <code>estabilidade()</code> com GMM no lugar do k-means e ver o que dá.</p>
+  </div>
+
+  <h4>5b · A vantagem real do GMM: incerteza por ponto</h4>
+<pre>g = GaussianMixture(<em>3</em>, covariance_type=<i>"tied"</i>, random_state=<em>0</em>, n_init=<em>5</em>).fit(Z)
+p = g.predict_proba(Z)
+conf = p.max(axis=<em>1</em>)                       <u># confiança da atribuição</u>
+<b>print</b>((conf &lt; <em>0.9</em>).sum(), <b>round</b>(conf.min(), <em>3</em>))
+<u># quantos pontos são ambíguos, e o mais incerto de todos</u></pre>
+  <p class="cap"><strong>Verificação:</strong> apenas <strong>1 ponto</strong> fica abaixo de 0,9 de confiança, e o mais incerto de todos tem 0,58.</p>
+  <div class="box box--obs">
+    <h5>Cruze com a silhueta — e prepare-se para uma surpresa</h5>
+    <p>Seria natural esperar que os pontos de baixa confiança fossem os de silhueta baixa. <strong>Não são.</strong> A correlação entre as duas medidas é de apenas <strong>0,144</strong>, e dos 15 pontos menos confiantes no GMM, só <strong>5</strong> estão entre os 15 de pior silhueta.</p>
+    <p>Faz sentido quando se olha o que cada uma pergunta. A silhueta compara <em>distâncias médias a conjuntos de pontos</em>; a confiança do GMM compara <em>densidades de probabilidade</em> sob gaussianas ajustadas. Um ponto na fronteira geométrica pode estar em região de alta densidade de uma componente e receber probabilidade quase 1.</p>
+    <p><strong>Duas medidas de incerteza que discordam são mais informativas que uma só</strong> — mas exigem que você saiba o que cada uma está medindo antes de reportá-las.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w6">
+  <div class="aulahead"><p class="n">Etapa 6 · 20 min</p><h2>Agrupar no espaço reduzido: quando ajuda, quando engana</h2></div>
+
+  <p>É prática comum reduzir com PCA antes de agrupar. Teste quantas componentes fazem diferença — e, ao mesmo tempo, onde a métrica deve ser medida.</p>
+
+<pre><b>from</b> sklearn.decomposition <b>import</b> PCA
+
+<b>for</b> nc <b>in</b> [<em>2</em>, <em>3</em>, <em>5</em>, <em>8</em>, <em>13</em>]:
+    A  = PCA(nc, random_state=<em>0</em>).fit_transform(Z)
+    la = KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(A)
+    <b>print</b>(nc, <b>round</b>(silhouette_score(A, la), <em>3</em>),      <u># medida no espaço reduzido</u>
+             <b>round</b>(silhouette_score(Z, la), <em>3</em>))       <u># medida no espaço completo</u></pre>
+
+  <div class="matpar">
+    <figure><figcaption>a mesma partição, duas réguas</figcaption>
+    <table class="mat">
+      <thead><tr><th>componentes</th><th>% da variância</th><th>silhueta no PCA</th><th>silhueta no 13D</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>55,4%</td><td class="hl">0,561</td><td>0,283</td></tr>
+        <tr><td>3</td><td>66,5%</td><td>0,453</td><td>0,284</td></tr>
+        <tr><td>5</td><td>80,2%</td><td>0,369</td><td>0,285</td></tr>
+        <tr><td>8</td><td>92,0%</td><td>0,315</td><td>0,285</td></tr>
+        <tr><td>13</td><td>100,0%</td><td>0,285</td><td>0,285</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--trap">
+    <h5>Duas leituras, e a segunda é a que importa</h5>
+    <p><strong>A coluna da direita é praticamente constante</strong> — 0,283 a 0,285. Reduzir de 13 para 2 componentes <em>não mudou a partição</em> de forma relevante; a informação que separa os grupos está nas primeiras componentes.</p>
+    <p><strong>A coluna do meio quase dobra</strong> conforme se reduz. Não é a partição melhorando: é a régua encurtando. Medida em 2 dimensões, a silhueta ignora as 11 direções em que os grupos se sobrepõem.</p>
+    <p><strong>Regra:</strong> reduza para visualizar e para acelerar, se quiser — mas <strong>meça sempre no espaço em que pretende afirmar o resultado</strong>. Uma silhueta de 0,561 obtida de um gráfico de PCA é um número inflado, e o leitor não tem como perceber.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w7">
+  <div class="aulahead"><p class="n">Etapa 7 · 20 min</p><h2>Abrir o gabarito e auditar cada decisão</h2></div>
+
+  <p>Agora sim. Você tomou quatro decisões — escala, k, algoritmo, espaço. Vamos avaliar as quatro.</p>
+
+<pre><b>from</b> sklearn.metrics <b>import</b> adjusted_rand_score, adjusted_mutual_info_score
+<b>from</b> sklearn.cluster <b>import</b> AgglomerativeClustering, HDBSCAN
+
+y = df.target
+particoes = {
+    <i>"k-means k=3"</i>:  KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(Z),
+    <i>"k-means k=2"</i>:  KMeans(<em>2</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(Z),
+    <i>"ward k=3"</i>:     AgglomerativeClustering(<em>3</em>, linkage=<i>"ward"</i>).fit_predict(Z),
+    <i>"GMM tied k=3"</i>: GaussianMixture(<em>3</em>, covariance_type=<i>"tied"</i>, random_state=<em>0</em>, n_init=<em>5</em>).fit_predict(Z),
+    <i>"GMM diag k=4"</i>: GaussianMixture(<em>4</em>, covariance_type=<i>"diag"</i>, random_state=<em>0</em>, n_init=<em>5</em>).fit_predict(Z),
+    <i>"HDBSCAN"</i>:      HDBSCAN(min_cluster_size=<em>10</em>).fit_predict(Z),
+    <i>"sem padronizar"</i>: KMeans(<em>3</em>, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(X),
+}
+<b>for</b> nome, lab <b>in</b> particoes.items():
+    <b>print</b>(<b>f</b><i>"{nome:16s} ARI {adjusted_rand_score(y, lab):.3f}  "</i>
+          <b>f</b><i>"AMI {adjusted_mutual_info_score(y, lab):.3f}"</i>)
+
+<u># k-means k=3     ARI 0.897  AMI 0.875</u>
+<u># k-means k=2     ARI 0.389  AMI 0.498</u>
+<u># ward k=3        ARI 0.790  AMI 0.784</u>
+<u># GMM tied k=3    ARI 0.912  AMI 0.895   &lt;- o melhor de todos</u>
+<u># GMM diag k=4    ARI 0.683  AMI 0.731   &lt;- o que o BIC escolheu</u>
+<u># HDBSCAN         ARI 0.260  AMI 0.347</u>
+<u># sem padronizar  ARI 0.371  AMI 0.423</u>
+
+l = particoes[<i>"k-means k=3"</i>]
+pd.crosstab(l, y)</pre>
+
+  <div class="matpar">
+    <figure><figcaption>o veredito das suas decisões</figcaption>
+    <table class="mat">
+      <thead><tr><th>decisão</th><th>ARI</th><th>o que o instrumento dizia</th></tr></thead>
+      <tbody>
+        <tr><td>sem padronizar</td><td>0,371</td><td>sil 0,571 · CH 561,8 · DB 0,534 — <strong>todos favoráveis</strong></td></tr>
+        <tr><td>StandardScaler, k-means, k=3</td><td class="hl">0,897</td><td>sil 0,285 · estabilidade 0,954</td></tr>
+        <tr><td>k=2</td><td>0,389</td><td>sil 0,268 — a 0,0166 de k=3</td></tr>
+        <tr><td>ward, k=3</td><td>0,790</td><td>sil 0,277</td></tr>
+        <tr><td>GMM <code>tied</code>, k=3</td><td class="hl">0,912</td><td>BIC 5572,6 — <strong>não era o mínimo</strong></td></tr>
+        <tr><td>GMM <code>diag</code>, k=4</td><td>0,683</td><td>BIC 5476,5 — <strong>era o mínimo</strong></td></tr>
+        <tr><td>HDBSCAN</td><td>0,260</td><td>2 grupos e 75 pontos como ruído</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="matpar">
+    <figure><figcaption>k-means × cultivar</figcaption>
+    <table class="mat">
+      <thead><tr><th></th><th>classe 0</th><th>classe 1</th><th>classe 2</th></tr></thead>
+      <tbody>
+        <tr><td>grupo 0</td><td>0</td><td class="hl">65</td><td>0</td></tr>
+        <tr><td>grupo 1</td><td>0</td><td>3</td><td class="hl">48</td></tr>
+        <tr><td>grupo 2</td><td class="hl">59</td><td>3</td><td>0</td></tr>
+      </tbody>
+    </table>
+    </figure>
+  </div>
+
+  <div class="box box--note">
+    <h5>Três auditorias, e o que cada uma ensina</h5>
+    <p><strong>1 · A escala.</strong> Os três índices internos foram unânimes a favor da resposta que dá ARI 0,371 em vez de 0,897. Nenhum instrumento geométrico poderia ter salvado essa decisão — ela se justifica pelo <em>argumento</em> (a distância euclidiana exige unidades comparáveis), não pela medição.</p>
+    <p><strong>2 · O k.</strong> A silhueta separava k=2 de k=3 por 0,0166, uma margem que qualquer ruído amostral apagaria. A <strong>estabilidade</strong> separava por 0,25, com desvios de 0,038 contra 0,276. Quando os instrumentos discordam em confiança, use o mais confiante.</p>
+    <p><strong>3 · O grupo 0.</strong> Ele tinha a pior silhueta (0,177) e 10,8% de pontos negativos — e é <strong>100% puro</strong>: 65 vinhos, todos da classe 1. <strong>Silhueta baixa não é grupo errado; é grupo disperso.</strong> Os 6 erros do k-means estão nos <em>outros</em> dois grupos, que tinham silhueta alta.</p>
+  </div>
+
+  <div class="box box--trap">
+    <h5>E o BIC?</h5>
+    <p>Ele escolheu <code>diag</code> com k=4, que dá ARI 0,683, em vez de <code>tied</code> com k=3, que dá <strong>0,912</strong> — o melhor resultado do laboratório. O BIC não errou de acordo com seu próprio objetivo: ele encontrou o modelo que melhor descreve a <em>densidade</em> dos dados com o menor número de parâmetros.</p>
+    <p>Descrever a densidade e recuperar categorias latentes são objetivos distintos. <strong>Todo critério responde exatamente à pergunta que formaliza</strong> — e cabe a você verificar se é a sua pergunta.</p>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="w8">
+  <div class="aulahead"><p class="n">Etapa 8 · 15 min</p><h2>A régua, e o que você poderia ter relatado</h2></div>
+
+<pre>rng = np.random.default_rng(<em>0</em>)
+Z_emb = Z.copy()
+<b>for</b> j <b>in</b> <b>range</b>(Z_emb.shape[<em>1</em>]):
+    rng.shuffle(Z_emb[:, j])       <u># destrói a relação entre colunas, preserva cada marginal</u>
+
+<b>for</b> k <b>in</b> [<em>2</em>, <em>3</em>, <em>4</em>]:
+    lb = KMeans(k, n_init=<em>20</em>, random_state=<em>0</em>).fit_predict(Z_emb)
+    <b>print</b>(k, <b>round</b>(silhouette_score(Z_emb, lb), <em>3</em>),
+             <b>round</b>(calinski_harabasz_score(Z_emb, lb), <em>1</em>))
+<u># 2  0.070   ...</u>
+<u># 3  0.068   13.3</u>
+<u># 4  0.072   ...</u></pre>
+
+  <div class="tw">
+  <table>
+    <thead><tr><th></th><th class="num">dados reais</th><th class="num">embaralhados</th><th class="num">razão</th></tr></thead>
+    <tbody>
+      <tr><td>silhueta (k=3)</td><td class="num">0,285</td><td class="num">0,068</td><td class="num"><strong>4,2×</strong></td></tr>
+      <tr><td>Calinski-Harabasz (k=3)</td><td class="num">70,9</td><td class="num">13,3</td><td class="num"><strong>5,3×</strong></td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p>Uma silhueta de 0,285 parece baixa em termos absolutos. <strong>Sem a régua você não teria como julgar</strong> — e poderia ter descartado um agrupamento que acerta 172 de 178.</p>
+
+  <div class="box box--note">
+    <h5>O parágrafo que você escreveria no relatório</h5>
+    <p style="border-left:2px solid var(--rule);padding-left:12px;font-style:italic">
+    "Padronizamos as 13 variáveis com <code>StandardScaler</code>, dado que as escalas diferem por até 2.530×. Particionamos com k-means; escolhemos <strong>k = 3</strong> por três critérios convergentes — silhueta (0,285, máxima em k=3), estatística gap (k=3 pelo critério de Tibshirani) e <strong>estabilidade por reamostragem</strong> (ARI 0,954 ± 0,038 entre subamostras de 80%, contra 0,706 ± 0,276 em k=2). A silhueta obtida compara-se a 0,068 sobre os mesmos dados com colunas permutadas. Um dos três grupos apresenta coesão menor (silhueta média 0,177; 10,8% de pontos com silhueta negativa) e deve ser interpretado com cautela."</p>
+    <p>Repare no que esse parágrafo faz: declara o pré-processamento e o motivo, o k e <strong>os três critérios</strong>, a linha de base, e a fragilidade conhecida. Nenhuma frase afirma ter "descoberto" três grupos.</p>
+  </div>
+
+  <div class="exwrap">
+    <h4>Três desafios</h4>
+    <div class="ex">
+      <p class="ex__t"><b>1</b>Estabilidade para escolher a escala<span class="tag">20 min</span></p>
+      <p>Na etapa 1 os índices internos falharam em comparar espaços diferentes. A estabilidade tem o mesmo problema? Rode <code>estabilidade(Z, 3)</code> para cada uma das cinco transformações e compare.</p>
+      <details class="resp"><summary>Pense antes de abrir</summary><div class="in">
+      <p>A estabilidade <strong>também</strong> é calculada dentro de um espaço, então a comparação entre espaços continua discutível — mas há uma diferença: ela mede <em>reprodutibilidade</em>, não separação, e não é inflada por uma variável de escala grande dominar a distância.</p>
+      <p>Faça o teste e discuta. Se a estabilidade também favorecer o dado bruto, você terá aprendido que <strong>nenhum critério interno resolve a questão da escala</strong> — ela é uma decisão de modelagem, justificada por argumento sobre as unidades, não por medição.</p>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>2</b>Consenso entre execuções<span class="tag">25 min</span></p>
+      <p>Construa uma <strong>matriz de coassociação</strong>: rode k-means 100 vezes com sementes diferentes e conte, para cada par de vinhos, em quantas execuções eles caíram juntos. Divida por 100. Depois agrupe essa matriz (por exemplo com <code>AgglomerativeClustering(3, metric="precomputed", linkage="average")</code> sobre <code>1 - coassociação</code>).</p>
+      <p>Compare o ARI do consenso com o do k-means simples. E olhe os pares com coassociação próxima de 0,5: são exatamente os pontos que a etapa 4 marcou com silhueta negativa?</p>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>3</b>Quantas variáveis bastam?<span class="tag">20 min</span></p>
+      <p>Pela ANOVA da etapa 4, <code>flavanoids</code>, <code>od280/od315</code> e <code>proline</code> lideram. Agrupe usando <strong>apenas essas três</strong> e compare o ARI com o das 13.</p>
+      <p>Depois faça o oposto: agrupe com as três <em>menos</em> discriminantes. A diferença entre os dois resultados é o argumento a favor de seleção de atributos antes de agrupar — e o alerta de que a seleção foi feita <strong>usando os próprios grupos</strong>, o que é circular. Como você tornaria o procedimento honesto?</p>
+    </div>
+  </div>
+
+  <div class="box box--note">
+    <h5>As cinco lições deste laboratório</h5>
+    <ol>
+      <li><strong>Índices internos comparam partições, não espaços.</strong> Os três foram unânimes a favor de não padronizar, e os três estavam errados.</li>
+      <li><strong>A estabilidade é o critério mais decisivo aqui</strong> — separou k=2 de k=3 por 0,25 onde a silhueta separava por 0,017.</li>
+      <li><strong>O gap statistic formaliza a régua do ruído</strong>, comparando com uma hipótese nula explícita em vez de um limiar de gosto.</li>
+      <li><strong>Silhueta baixa não é grupo errado.</strong> O grupo de pior silhueta era 100% puro.</li>
+      <li><strong>Todo critério responde à pergunta que formaliza.</strong> O BIC descreve densidade; não prometeu recuperar cultivares, e não recuperou.</li>
+    </ol>
+  </div>
+  <a class="top" href="#" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+</main>
+</div><!-- /wrap -->
+
+<footer>
+  <div class="col">
+    Laboratório avançado de agrupamento · Machine Learning<br>
+    Dataset: <code>sklearn.datasets.load_wine</code> — 178 vinhos, três cultivares, 13 medidas químicas<br>
+    Estatística gap conforme Tibshirani, Walther &amp; Hastie (2001). Todos os valores vêm de execução.
+  </div>
+</footer>
+<script>
+"use strict";
+/* ---------- botão de copiar código ---------- */
+(function(){
+  try{
+    document.querySelectorAll('pre').forEach(function(p){
+      var b=document.createElement('button');
+      b.className='copiar'; b.type='button'; b.textContent='copiar';
+      b.addEventListener('click',function(){
+        var t=p.cloneNode(true); var x=t.querySelector('.copiar'); if(x)x.remove();
+        var txt=t.textContent.replace(/^\n/,'');
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(txt).then(function(){
+            b.textContent='copiado'; setTimeout(function(){b.textContent='copiar'},1400);
+          });
+        }
+      });
+      p.appendChild(b);
+    });
+  }catch(e){}
+})();
+
+/* ---------- trilho: seção visível ---------- */
+(function(){
+  try{
+    if(typeof IntersectionObserver!=='function')return;
+    var links=[].slice.call(document.querySelectorAll('.rail nav a')),
+        alvos=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))}).filter(Boolean);
+    if(!alvos.length)return;
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(!e.isIntersecting)return;
+        links.forEach(function(a){a.classList.toggle('on', a.getAttribute('href')==='#'+e.target.id)});
+      });
+    },{rootMargin:'-15% 0px -70% 0px',threshold:0});
+    alvos.forEach(function(t){io.observe(t)});
+  }catch(e){}
+})();
+
+/* ---------- índice recolhível no mobile ---------- */
+(function(){
+  try{
+    var b=document.getElementById('railtoggle'), r=document.getElementById('rail');
+    if(!b||!r)return;
+    b.addEventListener('click',function(){
+      var ab=r.classList.toggle('aberto');
+      b.setAttribute('aria-expanded',ab); b.textContent=ab?'Fechar':'Índice';
+    });
+    r.addEventListener('click',function(e){
+      if(e.target.closest('nav a')&&window.innerWidth<=1080){
+        r.classList.remove('aberto'); b.setAttribute('aria-expanded',false); b.textContent='Índice';
+      }
+    });
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
