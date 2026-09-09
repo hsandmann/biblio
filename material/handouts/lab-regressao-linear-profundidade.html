@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Regressão linear em profundidade — projeção, alavancagem e condicionamento</title>
+<style>
+:root{
+  /* ---- superfícies ---- */
+  --paper:#EBEEE8; --paper-2:#F7F8F4; --card:#FFFFFF; --code:#F2F5F0;
+  /* ---- tinta ---- */
+  --ink:#13242B; --ink-soft:#4C5F66; --ink-faint:#849498;
+  /* ---- acentos: um por ideia ---- */
+  --hydro:#1F6B8E;      /* a reta / mínimos quadrados */
+  --revision:#7A2E86;   /* o gradiente */
+  --veg:#5A7A3F;        /* resíduos */
+  --contour:#A8763F; --danger:#9E3B2E;
+  /* ---- linhas ---- */
+  --rule:rgba(19,36,43,.14); --rule-strong:rgba(19,36,43,.30);
+  --canvas-grid:#DDE4DC;
+  /* ---- tipografia ---- */
+  --display:'Archivo',system-ui,-apple-system,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --rail:250px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.66;letter-spacing:.002em;-webkit-font-smoothing:antialiased}
+img,canvas{max-width:100%}
+a{color:var(--hydro);text-underline-offset:3px;text-decoration-thickness:1px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2.5px solid var(--revision);outline-offset:3px}
+
+/* ---------- RAIL ---------- */
+.rail{position:fixed;inset:0 auto 0 0;width:var(--rail);background:var(--paper-2);border-right:1px solid var(--rule-strong);padding:22px 0 40px;overflow-y:auto;z-index:40}
+.rail__brand{padding:0 18px 14px;border-bottom:1px solid var(--rule)}
+.rail__mark{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--contour);display:block;margin-bottom:6px}
+.rail__title{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.22;letter-spacing:-.008em;margin:0}
+.rail__sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:6px;letter-spacing:.04em}
+.rail nav{padding:12px 0 0}
+.rail h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);margin:16px 18px 6px;font-weight:600}
+.rail a{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;padding:6px 18px;font-family:var(--display);font-weight:500;font-size:12.8px;line-height:1.34;color:var(--ink-soft);text-decoration:none;border-left:2.5px solid transparent}
+.rail a b{font-family:var(--mono);font-weight:500;font-size:10.5px;color:var(--contour)}
+.rail a:hover{color:var(--ink);background:rgba(31,107,142,.06)}
+.rail a.on{color:var(--revision);border-left-color:var(--revision);background:rgba(122,46,134,.06)}
+.rail a.on b{color:var(--revision)}
+.rail__foot{padding:18px 18px 0;margin-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6}
+.railtoggle{display:none}
+
+/* ---------- LAYOUT ---------- */
+.wrap{margin-left:var(--rail)}
+.col{max-width:820px;margin:0 auto;padding:0 34px}
+.col--wide{max-width:1080px}
+
+/* ---------- HERO ---------- */
+.hero{border-bottom:1px solid var(--rule-strong);background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 60%),var(--paper);padding:54px 0 0}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--contour);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:700;letter-spacing:-.022em;line-height:1.02;font-size:clamp(34px,5.4vw,58px);margin:0 0 18px}
+h1 em{font-style:normal;color:var(--revision)}
+.deck{font-size:19px;line-height:1.55;color:var(--ink-soft);max-width:58ch;margin:0 0 26px}
+.deck b{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule-strong);margin-top:8px}
+.meta div{flex:1 1 0;min-width:120px;padding:14px 16px 16px;border-right:1px solid var(--rule)}
+.meta div:last-child{border-right:0}
+.meta span{display:block;font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;color:var(--ink)}
+.meta small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:5px}
+
+/* ---------- SECTIONS ---------- */
+section{padding:64px 0 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.aulahead{margin-bottom:30px}
+.aulahead .n{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--revision);display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.aulahead .n::after{content:"";flex:1;height:1px;background:var(--rule-strong)}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(25px,3.2vw,34px);letter-spacing:-.018em;line-height:1.14;margin:0 0 12px}
+h3{font-family:var(--display);font-weight:700;font-size:19.5px;letter-spacing:-.008em;margin:42px 0 10px;scroll-margin-top:20px}
+h3 span{font-family:var(--mono);font-weight:500;font-size:13px;color:var(--contour);margin-right:9px}
+h4{font-family:var(--display);font-weight:600;font-size:15.5px;margin:26px 0 8px;letter-spacing:-.003em}
+p{margin:0 0 15px}
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin-bottom:7px}
+li::marker{color:var(--contour)}
+strong{font-weight:600}
+.lede{font-size:18px;line-height:1.55;color:var(--ink-soft);max-width:60ch}
+.goals{background:var(--paper-2);border:1px solid var(--rule);padding:18px 22px 14px;margin:0 0 8px}
+.goals h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;font-weight:600}
+.goals ul{margin:0;padding-left:18px;font-size:16px}
+
+/* ---------- MATH ---------- */
+.eq{margin:20px 0;padding:14px 18px;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--hydro);font-family:var(--mono);font-size:14.5px;line-height:1.9;overflow-x:auto}
+.eq b{color:var(--hydro);font-weight:600}
+.eq i{font-style:italic;color:var(--ink-soft)}
+.eq .lbl{float:right;font-size:11px;color:var(--ink-faint);letter-spacing:.08em}
+
+/* ---------- CODE ---------- */
+pre{background:var(--code);color:#1B2F36;font-family:var(--mono);font-size:13px;line-height:1.72;padding:16px 18px;overflow-x:auto;margin:0 0 16px;border:1px solid var(--rule);border-left:3px solid var(--hydro)}
+pre b{color:#0F5B7E;font-weight:600}
+pre i{color:#3E6B2F;font-style:normal}
+pre u{color:#7C8C91;text-decoration:none}
+pre em{color:#9A5A17;font-style:normal}
+code{font-family:var(--mono);font-size:.88em;background:rgba(31,107,142,.10);padding:1px 5px;border-radius:2px}
+.filelabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 6px}
+
+/* ---------- FIGURES / DEMOS ---------- */
+figure.fig{margin:24px 0 28px;border:1px solid var(--rule-strong);background:var(--card);padding:14px 14px 11px}
+figure.fig canvas{display:block;width:100%;height:auto;background:#FBFCF9;border:1px solid var(--rule)}
+figure.fig figcaption{font-family:var(--body);font-size:14.5px;line-height:1.55;color:var(--ink-soft);margin-top:11px;border-top:1px solid var(--rule);padding-top:10px}
+figure.fig figcaption b{color:var(--ink);font-weight:600}
+.demohead{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--revision);margin:0 0 9px;font-weight:600}
+.demohead span{color:var(--ink-faint);float:right;letter-spacing:.08em}
+.ctrls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:11px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.ctrls label{display:flex;align-items:center;gap:7px}
+.ctrls input[type=range]{accent-color:var(--hydro);width:130px}
+.ctrls output{color:var(--hydro);font-weight:600;min-width:3.4em;display:inline-block}
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;padding:6px 12px;border:1px solid var(--rule-strong);background:transparent;cursor:pointer;color:var(--ink-soft);transition:.15s}
+.btn:hover{border-color:var(--hydro);color:var(--ink)}
+.btn--on,.btn[aria-pressed="true"]{background:rgba(31,107,142,.13);color:var(--ink);border-color:var(--hydro);box-shadow:inset 2px 0 0 var(--hydro)}
+.btn--go{background:var(--revision);color:#fff;border-color:var(--revision)}
+.btn--go:hover{background:#8f39a0;color:#fff}
+.readout{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.75;margin-top:10px;min-height:1.2em}
+.readout b{color:var(--ink)}
+
+/* ---------- CALLOUTS ---------- */
+.box{border:1px solid var(--rule-strong);border-left-width:3px;padding:15px 19px 12px;margin:20px 0;background:var(--card);font-size:16px}
+.box h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 8px;font-weight:600}
+.box p:last-child,.box ul:last-child{margin-bottom:0}
+.box--obs{border-left-color:var(--veg)} .box--obs h5{color:var(--veg)}
+.box--trap{border-left-color:var(--revision)} .box--trap h5{color:var(--revision)}
+.box--note{border-left-color:var(--hydro)} .box--note h5{color:var(--hydro)}
+.box--warn{border-left-color:var(--danger)} .box--warn h5{color:var(--danger)}
+
+/* ---------- TABLES ---------- */
+.tw{overflow-x:auto;margin:18px 0 22px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-family:var(--mono)}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap}
+thead th{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--rule-strong);font-weight:600}
+tbody tr:hover{background:rgba(31,107,142,.05)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.txt{font-family:var(--body);font-size:15px;line-height:1.55}
+table.txt td{white-space:normal;vertical-align:top}
+caption{caption-side:bottom;text-align:left;font-family:var(--mono);font-size:11px;color:var(--ink-faint);padding-top:9px;line-height:1.6}
+
+/* ---------- EXERCISES ---------- */
+.exwrap{margin:34px 0 10px;border-top:2px solid var(--ink);padding-top:20px}
+.exwrap > h4{margin-top:0;font-size:13px;font-family:var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.ex{border-left:2.5px solid var(--revision);padding:2px 0 2px 18px;margin:0 0 24px}
+.ex__t{font-family:var(--display);font-weight:600;font-size:15.5px;letter-spacing:-.003em;margin:0 0 7px}
+.ex__t b{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--revision);margin-right:8px}
+.ex p{font-size:16px}
+.tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;border:1px solid var(--rule-strong);padding:2px 7px;margin-left:8px;color:var(--ink-faint);vertical-align:2px}
+details{margin-top:10px;border-top:1px dashed var(--rule-strong);padding-top:9px}
+summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hydro);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";font-size:11px}
+details[open] summary::before{content:"▾ "}
+details > div{padding-top:10px;font-size:16px}
+details pre{font-size:12.2px}
+
+.top{display:block;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none;margin:38px 0 0;padding-bottom:6px}
+.top:hover{color:var(--revision)}
+footer{margin-top:60px;border-top:1px solid var(--rule-strong);background:var(--paper-2);padding:36px 0 60px}
+footer .col{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.85}
+
+@media (max-width:1080px){
+  :root{--rail:0px}
+  .rail{position:static;width:auto;border-right:0;border-bottom:1px solid var(--rule-strong)}
+  .rail nav{display:none;max-width:820px;margin:0 auto;padding:8px 20px 16px}
+  .rail nav.open{display:block}
+  .rail__brand{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 34px 14px}
+  .railtoggle{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--rule-strong);background:transparent;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  .rail a{padding:5px 0}
+  .rail__foot{display:none}
+  .col{padding:0 22px}
+}
+@media (max-width:560px){body{font-size:16px}.col{padding:0 16px}.meta div{flex:1 1 50%;border-bottom:1px solid var(--rule)}}
+@media print{
+  .rail,.top,.ctrls,.railtoggle{display:none}
+  .wrap{margin-left:0}
+  body{background:#fff;font-size:11pt}
+  section{padding:22px 0 0;page-break-inside:auto}
+  figure.fig,.box,.ex{page-break-inside:avoid}
+  h2,h3{page-break-after:avoid}
+  details{display:block}
+  details > div{display:block!important}
+  a{color:var(--ink);text-decoration:none}
+}
+
+</style>
+</head>
+<body>
+<script>
+/* Navegação interna resistente a iframe: resolve o alvo pelo id, sem depender da URL. */
+window.__ir=function(a){
+  var id=(a.getAttribute('href')||'').replace(/^.*#/,'');
+  if(!id){window.scrollTo({top:0,behavior:'smooth'});return false}
+  var el=document.getElementById(id);
+  if(el){el.scrollIntoView({behavior:'smooth',block:'start'});return false}
+  return true;
+};
+</script>
+<aside id="rail" class="rail">
+  <div class="rail__brand">
+    <div>
+      <span class="rail__mark">Insper · Machine Learning</span>
+      <p class="rail__title">Regressão linear<br>em profundidade</p>
+      <p class="rail__sub">Estudo autoguiado</p>
+    </div>
+    <button id="railtoggle" class="railtoggle">índice</button>
+  </div>
+  <nav>
+    <h4>A estrutura</h4>
+    <a href="#s1"><b>01</b><span>Um problema de ângulo reto</span></a>
+    <a href="#s2"><b>02</b><span>As equações normais, na álgebra</span></a>
+    <a href="#s3"><b>03</b><span>Por que quadrados, de verdade</span></a>
+    <h4>O diagnóstico</h4>
+    <a href="#s4"><b>04</b><span>A matriz chapéu e a alavancagem</span></a>
+    <a href="#s5"><b>05</b><span>Influência: quem move a reta</span></a>
+    <a href="#s6"><b>06</b><span>A banda de confiança</span></a>
+    <h4>O que quebra</h4>
+    <a href="#s7"><b>07</b><span>Multicolinearidade, vista de perto</span></a>
+    <a href="#s8"><b>08</b><span>Gauss–Markov e a letra miúda</span></a>
+    <a href="#s9"><b>09</b><span>Condicionamento e o gradiente</span></a>
+    <h4>Exercícios</h4>
+    <a href="#ex"><b>—</b><span>Seis, com gabarito</span></a>
+    <h4>Fontes</h4>
+    <a href="#ref"><b>—</b><span>Referências</span></a>
+  </nav>
+  <div class="rail__foot">
+    Aprofundamento.<br>Pressupõe o roteiro de aula<br>já percorrido.
+  </div>
+</aside>
+
+<div class="wrap">
+<header class="hero">
+  <div class="col col--wide">
+    <p class="eyebrow">Machine Learning · Regressão · Aprofundamento</p>
+    <h1>Tudo o que a reta assume,<br><em>e onde cada suposição quebra.</em></h1>
+    <p class="deck">O roteiro de aula mostra <b>como</b> ajustar e <b>o que</b> olhar depois. Este
+    documento explica <b>por quê</b>: de onde vem a fórmula fechada, o que exatamente a palavra
+    "melhor" garante quando dizemos que o OLS é o melhor estimador e por que quase toda estatística
+    impressa ao lado de um coeficiente depende de suposições que ninguém verificou.</p>
+    <div class="meta">
+      <div><span>3</span><small>simuladores</small></div>
+      <div><span>6</span><small>exercícios</small></div>
+      <div><span>1</span><small>identidade central</small></div>
+      <div><span>90</span><small>minutos</small></div>
+    </div>
+  </div>
+</header>
+
+<main class="col">
+
+<section id="s1">
+  <div class="aulahead"><p class="n">01 — a geometria</p><h2>Um problema de ângulo reto</h2></div>
+  <p class="lede">A fórmula (XᵀX)<sup>−1</sup>Xᵀy parece uma manipulação algébrica arbitrária. Ela
+  não é: é a resposta a uma pergunta de geometria e vista assim nunca mais precisa ser decorada.</p>
+
+  <p>Pense em y não como uma lista de n números, mas como <b>um único vetor</b> em ℝⁿ — uma seta num
+  espaço de n dimensões, uma por observação. Cada coluna de X é outro vetor no mesmo espaço: a coluna
+  de 1s é uma seta, a coluna do atributo x é outra.</p>
+
+  <p>Agora, a pergunta central. Qualquer previsão ŷ = Xw é uma combinação linear dessas colunas.
+  Variando w, o conjunto de todas as previsões possíveis varre um <b>subespaço</b> — com dois
+  parâmetros, um plano dentro de ℝⁿ. O vetor y quase certamente <i>não está</i> nesse plano: se
+  estivesse, o ajuste seria perfeito e todos os resíduos seriam zero.</p>
+
+  <p>Então a pergunta "qual é a melhor reta?" vira: <b>qual ponto do plano está mais próximo de
+  y?</b> E essa pergunta tem uma resposta que qualquer pessoa conhece desde a geometria do colégio:
+  o pé da perpendicular.</p>
+
+  <div class="box box--note">
+    <h5>A identidade central deste documento</h5>
+    <p>ŷ é a <b>projeção ortogonal</b> de y sobre o espaço-coluna de X. O vetor de resíduos
+    e = y − ŷ é perpendicular a esse espaço, o que se escreve como</p>
+    <div class="eq" style="margin:10px 0 6px"><b>Xᵀe = 0</b></div>
+    <p>Leia essa equação componente a componente: a primeira linha de Xᵀ é a coluna de 1s e dá
+    Σe<sub>i</sub> = 0. A segunda é a coluna de x e dá Σe<sub>i</sub>x<sub>i</sub> = 0. As duas
+    identidades que você verificou à mão no roteiro <b>são</b> a ortogonalidade, escrita por
+    extenso.</p>
+  </div>
+
+  <p>Essa leitura também explica uma coisa que costuma incomodar: por que o OLS mede distâncias
+  verticais e não perpendiculares <i>no gráfico de dispersão</i>. São dois espaços diferentes. No
+  gráfico x–y, com n pontos, a distância é vertical porque o erro é em y. No espaço ℝⁿ dos vetores,
+  a projeção é perpendicular. Não há contradição — as duas frases falam de geometrias distintas e
+  confundi-las é a origem de metade da confusão sobre o assunto.</p>
+</section>
+
+<section id="s2">
+  <div class="aulahead"><p class="n">02 — a álgebra</p><h2>As equações normais, derivadas</h2></div>
+  <p>Vale fazer a derivação uma vez na vida. Escreva a perda em forma matricial e expanda:</p>
+  <div class="eq">
+    J(w) = ‖y − Xw‖² = (y − Xw)ᵀ(y − Xw)<br>
+    &nbsp;&nbsp;&nbsp;&nbsp; = yᵀy − 2wᵀXᵀy + wᵀXᵀXw
+  </div>
+  <p>O termo do meio junta os dois produtos cruzados porque yᵀXw é escalar e um escalar é igual à
+  sua própria transposta. Agora derive em relação ao vetor w, usando as duas regras de cálculo
+  matricial que bastam aqui — ∂(aᵀw)/∂w = a e ∂(wᵀAw)/∂w = 2Aw para A simétrica:</p>
+  <div class="eq">
+    ∂J/∂w = −2Xᵀy + 2XᵀXw &nbsp;=&nbsp; 0
+    <br><br>
+    <b>XᵀXw = Xᵀy</b> <span class="lbl">as equações normais</span>
+  </div>
+  <p>Se XᵀX for invertível, ŵ = (XᵀX)<sup>−1</sup>Xᵀy. Note que a inversa aparece por conveniência de
+  notação, não por necessidade: nenhum software sério calcula essa inversa. Resolve-se o sistema
+  linear diretamente, por decomposição QR ou SVD, que é mais rápido e muito mais estável
+  numericamente.</p>
+  <div class="box box--obs">
+    <h5>Observe · por que se chamam "normais"</h5>
+    <p>Nada a ver com a distribuição normal. "Normal" aqui é o sentido geométrico da palavra:
+    perpendicular. As equações normais são a condição de perpendicularidade da seção 01 e o nome é
+    anterior a qualquer suposição gaussiana.</p>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="aulahead"><p class="n">03 — a justificativa</p><h2>Por que quadrados, de verdade</h2></div>
+  <p>"Porque é diferenciável" é uma justificativa fraca — |e| também poderia ser suavizado. A
+  justificativa forte é probabilística e mostra que os mínimos quadrados não são uma escolha de
+  conveniência, mas a consequência de um modelo explícito de ruído.</p>
+  <p>Suponha y<sub>i</sub> = w₀ + w₁x<sub>i</sub> + ε<sub>i</sub>, com ε<sub>i</sub> independentes e
+  normais de média zero e variância σ². A densidade de uma observação é então</p>
+  <div class="eq">p(y<sub>i</sub> | x<sub>i</sub>, w) = (1/√(2πσ²)) · exp( −e<sub>i</sub>² / 2σ² )</div>
+  <p>A verossimilhança do conjunto é o produto — as observações são independentes. Produtos de
+  exponenciais são desagradáveis, então tome o logaritmo, que é monótono e preserva o argmax:</p>
+  <div class="eq">
+    log L(w) = −(n/2)·log(2πσ²) − (1/2σ²) · <b>Σ e<sub>i</sub>²</b>
+  </div>
+  <p>O primeiro termo não depende de w. O segundo é a soma dos quadrados, com sinal negativo.
+  <b>Maximizar a verossimilhança é exatamente minimizar Σe<sub>i</sub>²</b> — os mínimos quadrados
+  caem prontos, sem terem sido postulados.</p>
+  <div class="box box--trap">
+    <h5>A armadilha · a recíproca não vale</h5>
+    <p>Isso mostra que ruído gaussiano <i>implica</i> mínimos quadrados. Não mostra que usar mínimos
+    quadrados exige ruído gaussiano — o OLS continua sendo o melhor estimador linear não-viesado sem
+    nenhuma suposição de normalidade (seção 08). A normalidade é necessária para os <b>p-valores e
+    intervalos</b>, não para o ajuste.</p>
+    <p>E note o que a derivação assume de passagem: σ² <b>igual para toda observação</b>. Essa é a
+    homoscedasticidade e é por isso que um resíduo em funil não é um detalhe estético — ele
+    invalida a própria derivação que justifica o método.</p>
+  </div>
+  <p>O mesmo raciocínio, com ruído de <b>Laplace</b> em vez de gaussiano, produz Σ|e<sub>i</sub>| —
+  os desvios absolutos mínimos. A escolha da função de perda é, sempre, uma afirmação sobre a
+  distribuição dos erros que você acredita existir.</p>
+</section>
+
+<section id="s4">
+  <div class="aulahead"><p class="n">04 — o diagnóstico</p><h2>A matriz chapéu e a alavancagem</h2></div>
+  <p>Substituindo ŵ na previsão, ŷ = Xŵ = X(XᵀX)<sup>−1</sup>Xᵀy. A matriz do meio ganhou nome
+  próprio porque põe o chapéu no y:</p>
+  <div class="eq"><b>H = X(XᵀX)<sup>−1</sup>Xᵀ</b> &nbsp;&nbsp; ŷ = Hy <span class="lbl">a matriz chapéu</span></div>
+  <p>H é a projeção da seção 01 escrita como matriz. Ela é simétrica e idempotente (HH = H, projetar
+  duas vezes é projetar uma) e o traço dela é o número de parâmetros.</p>
+  <p>O elemento diagonal h<sub>ii</sub> é a <b>alavancagem</b> da observação i e a sua interpretação
+  é direta e um pouco assustadora:</p>
+  <div class="eq">h<sub>ii</sub> = ∂ŷ<sub>i</sub> / ∂y<sub>i</sub> <span class="lbl">quanto a previsão segue o próprio dado</span></div>
+  <p>Ou seja: se você empurrar y<sub>i</sub> uma unidade para cima, a previsão nesse mesmo ponto sobe
+  h<sub>ii</sub>. Uma observação com h<sub>ii</sub> perto de 1 <b>arrasta a reta consigo</b> — e como
+  a reta a acompanha, o resíduo dela fica pequeno. É a mecânica exata daquele quarto caso do roteiro
+  de aula, agora com uma fórmula.</p>
+  <p>Na regressão simples, a alavancagem tem forma fechada e não depende de y coisa nenhuma:</p>
+  <div class="eq">h<sub>ii</sub> = 1/n + (x<sub>i</sub> − x̄)² ⁄ Σ(x<sub>j</sub> − x̄)²</div>
+  <p>Leia o que isso diz: a alavancagem é <b>pura geometria em x</b>. Um ponto em x̄ tem a
+  alavancagem mínima possível, 1/n. Quanto mais longe do centro, maior — e cresce com o
+  <i>quadrado</i> da distância. Some sobre todos os pontos e o total é sempre igual ao número de
+  parâmetros (2 aqui), o que dá a régua prática: <b>h<sub>ii</sub> acima de 2·(p/n) merece
+  atenção</b>.</p>
+</section>
+
+<section id="s5">
+  <div class="aulahead"><p class="n">05 — o diagnóstico</p><h2>Influência: quem move a reta</h2></div>
+  <p>Alavancagem é <i>potencial</i> de influência: mede posição em x e ignora y por completo. Um
+  ponto pode ter alavancagem altíssima e ser inofensivo, se cair exatamente sobre a reta que os
+  outros já definiam. Influência de fato é alavancagem <b>vezes</b> desalinhamento.</p>
+  <p>A medida padrão é a <a href="https://doi.org/10.1080/00401706.1977.10489493" target="_blank"><b>distância de Cook</b></a>, que responde a uma pergunta muito concreta:
+  quanto todas as previsões mudariam se eu removesse esta observação?</p>
+  <div class="eq">
+    D<sub>i</sub> = ( e<sub>i</sub>² ⁄ (p·s²) ) · ( h<sub>ii</sub> ⁄ (1 − h<sub>ii</sub>)² )
+    <span class="lbl">resíduo × alavancagem</span>
+  </div>
+  <p>Os dois fatores são o ponto inteiro. O primeiro é o resíduo: o quanto o modelo errou ali. O
+  segundo cresce explosivamente quando h<sub>ii</sub> → 1. Um ponto só é perigoso quando <b>os dois
+  fatores são não desprezíveis</b> — e a razão pela qual filtrar por resíduo grande falha é que o
+  segundo fator não aparece nesse filtro.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 01 · alavancagem e influência <span>arraste o ponto destacado</span></p>
+    <canvas id="d1"></canvas>
+    <div class="ctrls">
+      <button class="btn" id="d1r">↺ reiniciar</button>
+      <label><input type="checkbox" id="d1h" checked> mostrar h<sub>ii</sub> por ponto</label>
+    </div>
+    <p class="readout" id="d1o"></p>
+    <figcaption>O ponto roxo é seu. Arraste-o <b>na horizontal</b> primeiro, sem mexer em y: a
+    alavancagem dispara nas pontas e o resíduo mal se move. Depois arraste-o só na <b>vertical</b>,
+    uma vez perto do centro e outra na ponta, comparando o quanto a reta tracejada (sem o ponto) se
+    afasta da cheia (com o ponto). O tamanho de cada círculo é proporcional à alavancagem.</figcaption>
+  </figure>
+
+  <div class="box box--warn">
+    <h5>Cuidado · o que fazer com um ponto influente</h5>
+    <p>Não é "apagar". Um ponto influente é uma <b>pergunta</b>, não um defeito: pode ser erro de
+    digitação, pode ser a observação mais informativa do conjunto, pode indicar que o modelo linear
+    não vale naquela faixa. A conduta defensável é reportar o ajuste com e sem ele, explicando a
+    diferença. Apagar em silêncio e reportar só o R² melhor é fabricação de resultado.</p>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="aulahead"><p class="n">06 — o diagnóstico</p><h2>A banda de confiança</h2></div>
+  <p>A alavancagem tem uma consequência visual que raramente é ensinada junto: a <b>incerteza da
+  reta não é constante</b>. O erro-padrão da previsão média em um x qualquer é</p>
+  <div class="eq">
+    EP(ŷ | x) = s · √( 1/n + (x − x̄)² ⁄ Σ(x<sub>j</sub> − x̄)² )
+    <span class="lbl">= s·√h(x)</span>
+  </div>
+  <p>É a mesma expressão da alavancagem, sob uma raiz. Portanto a banda de confiança é uma
+  <b>hipérbole</b>: mais estreita em x̄, abrindo para os lados. A reta é conhecida com muito mais
+  precisão no meio dos dados do que nas bordas — e fora do intervalo observado a banda abre sem
+  limite, que é a formulação quantitativa de "não extrapole".</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 02 · a banda abre nas pontas <span>mexa em n e no ruído</span></p>
+    <canvas id="d2"></canvas>
+    <div class="ctrls">
+      <label>n <input id="d2n" type="range" min="6" max="120" step="1" value="24"><output id="d2nv">24</output></label>
+      <label>σ <input id="d2s" type="range" min="0.4" max="6" step="0.1" value="2.2"><output id="d2sv">2,2</output></label>
+      <label><input type="checkbox" id="d2p"> banda de <i>predição</i> também</label>
+    </div>
+    <p class="readout" id="d2o"></p>
+    <figcaption>A banda escura é a incerteza da <b>reta média</b>; a clara, quando ligada, é a da
+    <b>próxima observação</b> — que inclui o ruído individual e por isso é muito mais larga, quase
+    sem estreitar no centro. Aumente n: a banda escura encolhe com √n, a clara não. Essa é a
+    diferença entre "onde está a média" e "onde estará o próximo ponto", confundidas com enorme
+    frequência.</figcaption>
+  </figure>
+</section>
+
+<section id="s7">
+  <div class="aulahead"><p class="n">07 — o que quebra</p><h2>Multicolinearidade, vista de perto</h2></div>
+  <p>Dizer que "coeficientes ficam instáveis" é abstrato até você ver a instabilidade. O simulador
+  abaixo reajusta o mesmo modelo em amostras novas do mesmo processo e desenha cada par de
+  coeficientes estimados como um ponto.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 03 · a nuvem de estimativas <span>aumente a correlação entre x₁ e x₂</span></p>
+    <canvas id="d3"></canvas>
+    <div class="ctrls">
+      <label>corr(x₁,x₂) <input id="d3r" type="range" min="0" max="0.99" step="0.01" value="0"><output id="d3rv">0,00</output></label>
+      <button class="btn btn--go" id="d3g">+50 amostras</button>
+      <button class="btn" id="d3c">limpar</button>
+    </div>
+    <p class="readout" id="d3o"></p>
+    <figcaption>O alvo verdadeiro é w₁ = w₂ = <b>1,0</b>, marcado pela cruz. Com correlação zero a
+    nuvem é redonda e apertada. Suba para 0,95 e ela vira um charuto diagonal: as estimativas
+    individuais passeiam entre (3, −1) e (−1, 3), <b>mas a soma w₁+w₂ continua cravada em 2</b> —
+    é a barra no rodapé. Os dados sabem a soma; não sabem a divisão.</figcaption>
+  </figure>
+
+  <p>A medida padrão desse problema é o <b>VIF</b>, fator de inflação da variância. Para o
+  coeficiente j, regrida x<sub>j</sub> contra todos os outros atributos, pegue o R² dessa regressão
+  auxiliar e calcule:</p>
+  <div class="eq">VIF<sub>j</sub> = 1 ⁄ (1 − R²<sub>j</sub>)</div>
+  <p>A leitura é literal: o erro-padrão de w<sub>j</sub> fica √VIF vezes maior do que ficaria se
+  x<sub>j</sub> fosse ortogonal aos demais. Com R²<sub>j</sub> = 0,9 o VIF é 10 e o erro-padrão
+  triplica. As réguas usuais — VIF acima de 5, ou de 10 — são convenções, não teoremas.</p>
+  <div class="box box--obs">
+    <h5>Observe · quando não é problema nenhum</h5>
+    <p>Se o seu objetivo é <b>prever</b>, multicolinearidade é largamente irrelevante: as previsões
+    e o R² de teste permanecem estáveis, como o simulador mostra pela soma constante. Ela só é fatal
+    quando você quer <b>interpretar</b> um coeficiente isolado — dizer "o efeito de x₁, mantido x₂
+    fixo" exige que os dados contenham variação de x₁ com x₂ fixo e é exatamente essa variação que
+    a colinearidade elimina.</p>
+  </div>
+</section>
+
+<section id="s8">
+  <div class="aulahead"><p class="n">08 — o que quebra</p><h2>Gauss–Markov e a letra miúda</h2></div>
+  <p>O teorema que sustenta a reputação do OLS diz: sob linearidade, erros de média zero, variância
+  constante e não correlacionados, o estimador de mínimos quadrados é <b>BLUE</b> — o de menor
+  variância entre os estimadores lineares não-viesados.</p>
+  <p>Toda palavra dessa sigla é uma restrição e ler cada uma é mais útil que decorar o enunciado.</p>
+  <div class="tw">
+    <table class="txt">
+      <thead><tr><th>Palavra</th><th>O que exclui</th></tr></thead>
+      <tbody>
+        <tr><td><b>Linear</b></td><td>Estimadores que não são combinação linear de y. A mediana condicional, por exemplo, fica de fora — e em dados com cauda pesada ela pode ser bem melhor.</td></tr>
+        <tr><td><b>Unbiased</b> (não-viesado)</td><td>Todos os estimadores <i>enviesados</i> — e é aqui que mora a ironia. Ridge é enviesado de propósito e frequentemente tem erro quadrático <b>menor</b>. "Não-viesado" não é sinônimo de "melhor".</td></tr>
+        <tr><td><b>Best</b></td><td>Significa apenas "de menor variância", dentro das duas restrições acima. Não significa mais nada.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Repare no que <b>não</b> aparece na lista de hipóteses: normalidade. Gauss–Markov não precisa
+  dela. Ela entra só quando você quer que t e F tenham as distribuições tabeladas — ou seja, para
+  p-valores e intervalos exatos em amostra pequena. Em amostra grande o teorema central do limite
+  cuida disso e a normalidade dos erros deixa de importar muito.</p>
+  <div class="box box--trap">
+    <h5>A armadilha · a hipótese que ninguém lista</h5>
+    <p>Há uma quarta condição, silenciosa e mais frequentemente violada que todas: <b>o modelo está
+    correto</b>. Se falta uma variável relevante que é correlacionada com as incluídas, todos os
+    coeficientes ficam enviesados — o famoso viés de variável omitida — e nenhum diagnóstico de
+    resíduo é obrigado a denunciá-lo. Não existe teste estatístico para "eu esqueci de medir algo
+    importante".</p>
+  </div>
+</section>
+
+<section id="s9">
+  <div class="aulahead"><p class="n">09 — a ponte</p><h2>Condicionamento e o gradiente</h2></div>
+  <p>A geometria da seção 07 e o comportamento do gradiente descendente são <b>o mesmo fenômeno</b>
+  e é satisfatório ver a ligação explícita.</p>
+  <p>A forma das curvas de nível de J é governada por XᵀX — a Hessiana de J é 2XᵀX. Os
+  <i>autovetores</i> dão as direções dos eixos da elipse; os <i>autovalores</i> dão o quanto ela é
+  esticada em cada direção, com o semieixo proporcional a 1/√λ (autovalor grande = direção íngreme =
+  eixo curto). A razão entre o maior e o menor é o <b>número de condição</b> κ:</p>
+  <div class="eq">κ = λ<sub>max</sub> ⁄ λ<sub>min</sub> <span class="lbl">a excentricidade do vale</span></div>
+  <p>Com κ = 1 as curvas são círculos e o gradiente aponta direto para o mínimo: uma iteração
+  resolveria. Quanto maior κ, mais alongado o vale, mais o gradiente aponta atravessado e — este é
+  o resultado clássico — o número de iterações do gradiente descendente cresce <b>proporcionalmente
+  a κ</b>.</p>
+  <p>Agora junte as peças:</p>
+  <ul>
+    <li>atributos em escalas muito diferentes ⟹ κ grande ⟹ convergência lenta. Padronizar reduz κ;</li>
+    <li>atributos muito correlacionados ⟹ λ<sub>min</sub> → 0 ⟹ κ → ∞. É a mesma quase-singularidade
+    que faz os coeficientes oscilarem na seção 07;</li>
+    <li>não centrar x ⟹ acoplamento entre w₀ e w₁ ⟹ κ grande, mesmo com um único atributo. É o
+    experimento do roteiro de aula.</li>
+  </ul>
+  <p>E fecha o círculo: <a href="https://doi.org/10.1080/00401706.1970.10488634" target="_blank"><b>Ridge soma λI a XᵀX</b></a>. Isso eleva todos os autovalores por λ, o que
+  puxa λ<sub>min</sub> para longe de zero e derruba κ. A mesma operação, com uma única fórmula,
+  estabiliza os coeficientes, torna a matriz invertível quando ela não era e acelera a convergência
+  do gradiente. Não são três benefícios: é um só, visto de três ângulos.</p>
+</section>
+
+<section id="ex">
+  <div class="aulahead"><p class="n">Exercícios</p><h2>Seis, com gabarito</h2></div>
+  <p class="lede">Tente cada um antes de abrir. O gabarito confere o raciocínio, não só o número.</p>
+
+  <div class="exwrap">
+    <h4>Papel e caneta</h4>
+    <div class="ex">
+      <p class="ex__t"><b>1</b>A soma das alavancagens<span class="tag">papel</span></p>
+      <p>Mostre que, na regressão simples, Σ<sub>i</sub> h<sub>ii</sub> = 2. Depois explique por que
+      o resultado geral é Σh<sub>ii</sub> = p, o número de parâmetros.</p>
+      <details><summary>gabarito</summary><div>
+        <p>Some a fórmula fechada: Σh<sub>ii</sub> = Σ[1/n + (x<sub>i</sub>−x̄)²/S<sub>xx</sub>]
+        = n·(1/n) + S<sub>xx</sub>/S<sub>xx</sub> = 1 + 1 = 2.</p>
+        <p>No caso geral, Σh<sub>ii</sub> = tr(H) = tr(X(XᵀX)<sup>−1</sup>Xᵀ). Pela propriedade
+        cíclica do traço, isso é tr((XᵀX)<sup>−1</sup>XᵀX) = tr(I<sub>p</sub>) = p. Interpretação:
+        cada parâmetro estimado "gasta" exatamente uma unidade de alavancagem, distribuída entre as
+        observações. Com p = n a soma seria n, todo h<sub>ii</sub> = 1 e o ajuste passaria por todos
+        os pontos — interpolação, resíduo zero e nenhuma informação.</p>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>2</b>O ponto sem influência<span class="tag">papel</span></p>
+      <p>Uma observação está exatamente em x = x̄. Prove que removê-la não altera a inclinação
+      estimada w₁, qualquer que seja o valor de y dela.</p>
+      <details><summary>gabarito</summary><div>
+        <p>w₁ = Σ(x<sub>i</sub>−x̄)(y<sub>i</sub>−ȳ) / Σ(x<sub>i</sub>−x̄)². A observação em questão
+        tem (x<sub>i</sub>−x̄) = 0, logo contribui com zero ao numerador e zero ao denominador.</p>
+        <p>Cuidado com a sutileza: removê-la muda x̄ e ȳ dos demais? x̄ não — retirar um ponto que
+        está na média não move a média. ȳ muda, mas o numerador é invariante a deslocamentos de ȳ,
+        já que Σ(x<sub>i</sub>−x̄) = 0. Então w₁ é literalmente idêntico. O intercepto w₀ = ȳ − w₁x̄
+        <i>muda</i>, porque ȳ mudou. Alavancagem mínima, influência sobre a inclinação exatamente
+        nula.</p>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>3</b>R² nunca cai<span class="tag">papel</span></p>
+      <p>Prove que acrescentar qualquer atributo ao modelo não pode aumentar o SSE de treino — nem
+      se a coluna for ruído puro.</p>
+      <details><summary>gabarito</summary><div>
+        <p>Argumento geométrico, em uma linha. Adicionar uma coluna aumenta o espaço-coluna de X: o
+        subespaço antigo está <i>contido</i> no novo. O SSE é a distância ao quadrado de y até o
+        subespaço. A distância mínima a um conjunto maior nunca é maior que a um subconjunto dele —
+        no pior caso o coeficiente novo sai zero e você recupera o ajuste anterior exatamente.</p>
+        <p>Daí o R² ajustado, que penaliza p e daí a necessidade de validação: <i>nenhuma</i>
+        quantidade calculada só no treino consegue detectar que a coluna era ruído.</p>
+      </div></details>
+    </div>
+  </div>
+
+  <div class="exwrap">
+    <h4>Computador</h4>
+    <div class="ex">
+      <p class="ex__t"><b>4</b>Verifique a matriz chapéu<span class="tag">código</span></p>
+      <p>Com 30 pontos quaisquer, construa X com a coluna de 1s, calcule H e confirme
+      numericamente: (a) H é simétrica; (b) HH = H; (c) tr(H) = 2; (d) a diagonal bate com a fórmula
+      fechada de h<sub>ii</sub>; (e) ŷ = Hy é igual ao <code>predict</code> do sklearn.</p>
+      <details><summary>gabarito</summary><div>
+<pre><b>import</b> numpy <b>as</b> np
+X = np.<em>column_stack</em>([np.<em>ones_like</em>(x), x])
+H = X @ np.linalg.<em>inv</em>(X.T @ X) @ X.T
+<b>assert</b> np.<em>allclose</em>(H, H.T)                    <u># simétrica</u>
+<b>assert</b> np.<em>allclose</em>(H @ H, H)                  <u># idempotente</u>
+<b>assert</b> np.<em>allclose</em>(np.<em>trace</em>(H), <em>2</em>)             <u># traço = p</u>
+h = <em>1</em>/<em>len</em>(x) + (x-x.<em>mean</em>())**<em>2</em> / ((x-x.<em>mean</em>())**<em>2</em>).<em>sum</em>()
+<b>assert</b> np.<em>allclose</em>(np.<em>diag</em>(H), h)</pre>
+        <p>O item (b) é o que mais surpreende: projetar um vetor que já está no plano não o move.</p>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>5</b>Cook na prática<span class="tag">código</span></p>
+      <p>Implemente D<sub>i</sub> e compare com a força bruta: para cada i, remova a observação,
+      reajuste e meça o deslocamento das previsões. Confirme que o ranking coincide.</p>
+      <details><summary>gabarito</summary><div>
+        <p>A força bruta é D<sub>i</sub> = Σ<sub>j</sub>(ŷ<sub>j</sub> − ŷ<sub>j(i)</sub>)² / (p·s²),
+        onde ŷ<sub>(i)</sub> é o ajuste sem a observação i. A fórmula fechada existe justamente para
+        evitar n reajustes — e a coincidência dos dois é a demonstração de que ela mede o que
+        promete.</p>
+        <p>Usando o <b>mesmo</b> s² do modelo completo nas duas contas, elas não são apenas
+        parecidas: são idênticas até o épsilon de máquina (~10<sup>−15</sup>). Se você obtiver
+        diferença visível, quase certamente recalculou s² dentro do laço — o que responde a outra
+        pergunta.</p>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>6</b>Ridge derruba κ<span class="tag">código</span></p>
+      <p>Gere x₁ e x₂ com correlação 0,99, monte XᵀX e calcule κ com
+      <code>np.linalg.cond</code>. Depois calcule κ de (XᵀX + λI) para λ ∈ {0,01, 0,1, 1, 10} e
+      tabule. Em paralelo, rode o gradiente descendente nos dois casos e conte iterações até
+      convergir.</p>
+      <details><summary>gabarito</summary><div>
+        <p>κ deve cair de ordens de grandeza já com λ pequeno e a contagem de iterações deve cair
+        na mesma proporção — a relação iterações ∝ κ é visível numa tabela de quatro linhas.</p>
+        <p>Repare no custo: à medida que λ cresce, os coeficientes encolhem e se afastam do valor
+        verdadeiro. Você comprou estabilidade e velocidade com viés. É a troca inteira da
+        regularização, em uma tabela.</p>
+      </div></details>
+    </div>
+  </div>
+  <a class="top" href="#s1" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+
+<section id="ref">
+  <div class="aulahead"><p class="n">Referências</p><h2>As fontes</h2></div>
+  <ul>
+    <li><b>Cook, R. D.</b> "Detection of Influential Observation in Linear Regression".
+    <i>Technometrics</i> 19, n. 1 (1977): 15–18 — o artigo que introduz D<sub>i</sub>, usado na
+    seção 05. <a href="https://doi.org/10.1080/00401706.1977.10489493" target="_blank">DOI</a></li>
+    <li><b>Hoerl, A. E.; Kennard, R. W.</b> "Ridge Regression: Biased Estimation for Nonorthogonal
+    Problems". <i>Technometrics</i> 12, n. 1 (1970): 55–67 — a regularização da seção 09.
+    <a href="https://doi.org/10.1080/00401706.1970.10488634" target="_blank">DOI</a></li>
+    <li><b>Legendre, A.-M.</b> <i>Nouvelles méthodes pour la détermination des orbites des comètes</i>.
+    Courcier, 1805 — os mínimos quadrados, no apêndice. <a href="https://archive.org/details/nouvellesmthode00legegoog" target="_blank">Texto completo</a></li>
+    <li><b>Gauss, C. F.</b> <i>Theoria motus corporum coelestium</i>. Perthes &amp; Besser, 1809 — a
+    justificativa por máxima verossimilhança da seção 03 remonta a este texto.
+    <a href="https://archive.org/details/bub_gb_ORUOAAAAQAAJ" target="_blank">Texto completo</a></li>
+    <li><b>Galton, F.</b> "Regression towards Mediocrity in Hereditary Stature". <i>Journal of the
+    Anthropological Institute</i> 15 (1886): 246–263. <a href="https://galton.org/essays/1880-1889/galton-1886-jaigi-regression-stature.pdf" target="_blank">PDF</a></li>
+  </ul>
+  <a class="top" href="#s1" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+</main>
+
+<footer>
+  <div class="col">
+    Insper · Machine Learning · Regressão linear — aprofundamento.<br>
+    Simuladores em JavaScript, sem dependências: todo cálculo roda no navegador.<br>
+    Complementa o roteiro de aula; pressupõe-o lido.
+  </div>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ================= utilidades ================= */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function RNG(s){var f=mulberry(s);f.g=function(){var u=0,v=0;while(u===0)u=f();while(v===0)v=f();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v)};return f}
+
+var CL={},CANV=[];
+function cssv(n,f){var v=getComputedStyle(document.documentElement).getPropertyValue(n).trim();return v||f||'#8B99A6'}
+function syncTheme(){
+  /* fonte da verdade é o :root; os canvases só leem de lá */
+  CL.line=cssv('--hydro'); CL.grad=cssv('--revision'); CL.res=cssv('--veg');
+  CL.warn=cssv('--contour'); CL.red=cssv('--danger');
+  CL.tx=cssv('--ink'); CL.tx2=cssv('--ink-soft'); CL.tx3=cssv('--ink-faint');
+  CL.grid=cssv('--canvas-grid'); CL.bg='#FBFCF9';
+}
+syncTheme();
+
+function C(id,h){
+  var el=document.getElementById(id); if(!el)return null;
+  el.style.height=h+'px';
+  var o={el:el,h:h,g:el.getContext('2d'),w:300,draw:null};
+  o.fit=function(){var dpr=Math.min(window.devicePixelRatio||1,2);o.w=el.clientWidth||600;
+    el.width=Math.round(o.w*dpr);el.height=Math.round(h*dpr);o.g.setTransform(dpr,0,0,dpr,0,0)};
+  o.fit();
+  var t=null;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(function(){
+    try{o.fit();if(o.draw)o.draw()}catch(e){}},120)});
+  CANV.push(o); return o;
+}
+function clr(o){o.g.fillStyle=CL.bg;o.g.fillRect(0,0,o.w,o.h)}
+function T(g,s,x,y,c,sz,al,mono){g.fillStyle=c;g.font=(sz||11)+'px '+(mono===false?'system-ui,sans-serif':'ui-monospace,Menlo,Consolas,monospace');g.textAlign=al||'left';g.textBaseline='alphabetic';g.fillText(s,x,y)}
+function fmt(v,n){if(!isFinite(v))return '∞';return v.toFixed(n===undefined?2:n).replace('.',',')}
+function dash(g,on){g.setLineDash(on?[5,4]:[])}
+function seg(g,x1,y1,x2,y2,c,w){g.strokeStyle=c;g.lineWidth=w||1;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function dot(g,x,y,r,c,ring){g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,6.2832);g.fill();
+  if(ring){g.strokeStyle=ring;g.lineWidth=1.2;g.stroke()}}
+
+/* eixos simples com margens */
+function axes(o,M,xr,yr,xlab,ylab,xt,yt){
+  var g=o.g;
+  g.strokeStyle=CL.grid;g.lineWidth=1;
+  var i;
+  if(xt)for(i=0;i<xt.length;i++){var X=M.l+(xt[i]-xr[0])/(xr[1]-xr[0])*(o.w-M.l-M.r);
+    seg(g,X,M.t,X,o.h-M.b,CL.grid,1);T(g,fmt(xt[i],xt.dec===undefined?0:xt.dec),X,o.h-M.b+15,CL.tx3,10,'center')}
+  if(yt)for(i=0;i<yt.length;i++){var Y=o.h-M.b-(yt[i]-yr[0])/(yr[1]-yr[0])*(o.h-M.t-M.b);
+    seg(g,M.l,Y,o.w-M.r,Y,CL.grid,1);T(g,fmt(yt[i],yt.dec===undefined?0:yt.dec),M.l-6,Y+3.5,CL.tx3,10,'right')}
+  g.strokeStyle=CL.tx3;g.lineWidth=1;g.strokeRect(M.l,M.t,o.w-M.l-M.r,o.h-M.t-M.b);
+  if(xlab)T(g,xlab,(M.l+o.w-M.r)/2,o.h-4,CL.tx2,10.5,'center');
+  if(ylab){g.save();g.translate(11,(M.t+o.h-M.b)/2);g.rotate(-Math.PI/2);T(g,ylab,0,0,CL.tx2,10.5,'center');g.restore()}
+}
+function mapper(o,M,xr,yr){
+  return {
+    X:function(v){return M.l+(v-xr[0])/(xr[1]-xr[0])*(o.w-M.l-M.r)},
+    Y:function(v){return o.h-M.b-(v-yr[0])/(yr[1]-yr[0])*(o.h-M.t-M.b)},
+    iX:function(p){return xr[0]+(p-M.l)/(o.w-M.l-M.r)*(xr[1]-xr[0])},
+    iY:function(p){return yr[0]+(o.h-M.b-p)/(o.h-M.t-M.b)*(yr[1]-yr[0])}
+  };
+}
+/* OLS simples, usado por vários demos */
+function ols(P){
+  var n=P.length,i,mx=0,my=0;
+  for(i=0;i<n;i++){mx+=P[i].x;my+=P[i].y} mx/=n;my/=n;
+  var sxy=0,sxx=0,syy=0;
+  for(i=0;i<n;i++){sxy+=(P[i].x-mx)*(P[i].y-my);sxx+=(P[i].x-mx)*(P[i].x-mx);syy+=(P[i].y-my)*(P[i].y-my)}
+  var b=sxx>1e-12?sxy/sxx:0, a=my-b*mx, sse=0;
+  for(i=0;i<n;i++){var e=P[i].y-(a+b*P[i].x);sse+=e*e}
+  return {a:a,b:b,sse:sse,sst:syy,r2:syy>1e-12?1-sse/syy:0,mx:mx,my:my,sxx:sxx,syy:syy,sxy:sxy,n:n};
+}
+function pos(o,ev){var r=o.el.getBoundingClientRect();var e=ev.touches?ev.touches[0]:ev;
+  return {x:(e.clientX-r.left)*(o.w/r.width),y:(e.clientY-r.top)*(o.h/r.height)}}
+
+/* rail: marca a seção visível */
+window.addEventListener('DOMContentLoaded',function(){
+  var links=[].slice.call(document.querySelectorAll('.rail a[href^="#"]'));
+  var secs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))});
+  function upd(){
+    var best=0,bd=1e9;
+    for(var i=0;i<secs.length;i++){if(!secs[i])continue;
+      var d=Math.abs(secs[i].getBoundingClientRect().top-90);
+      if(d<bd){bd=d;best=i}}
+    links.forEach(function(a,i){a.classList.toggle('on',i===best)});
+  }
+  window.addEventListener('scroll',upd,{passive:true});upd();
+  var tg=document.getElementById('railtoggle');
+  if(tg)tg.addEventListener('click',function(){document.querySelector('.rail nav').classList.toggle('open')});
+});
+
+/* ========== DEMO 01 — alavancagem e influência ========== */
+(function(){
+  var cv=C('d1',400); if(!cv)return;
+  var M={l:48,r:16,t:16,b:40},XR=[0,10],YR=[0,24];
+  var base=[],alvo={x:8.5,y:16.5},arrasta=false,mostra=true;
+  var out=document.getElementById('d1o');
+  function reset(){var R=RNG(23);base=[];for(var i=0;i<18;i++){var x=0.6+i*0.52;
+    base.push({x:x,y:3+1.6*x+R.g()*1.5})} alvo={x:8.5,y:16.5}; pinta()}
+  document.getElementById('d1r').addEventListener('click',reset);
+  document.getElementById('d1h').addEventListener('change',function(e){mostra=e.target.checked;pinta()});
+  function m(){return mapper(cv,M,XR,YR)}
+  cv.el.addEventListener('pointerdown',function(e){var p=pos(cv,e),mm=m();
+    var d=Math.pow(mm.X(alvo.x)-p.x,2)+Math.pow(mm.Y(alvo.y)-p.y,2); arrasta=d<2500});
+  cv.el.addEventListener('pointermove',function(e){if(!arrasta)return;var p=pos(cv,e),mm=m();
+    alvo.x=Math.max(XR[0]+.2,Math.min(XR[1]-.2,mm.iX(p.x)));
+    alvo.y=Math.max(YR[0]+.4,Math.min(YR[1]-.4,mm.iY(p.y)));pinta()});
+  window.addEventListener('pointerup',function(){arrasta=false});
+
+  function pinta(){
+    var g=cv.g;clr(cv);
+    axes(cv,M,XR,YR,'x','y',[0,2,4,6,8,10],[0,6,12,18,24]);
+    var mm=m(),i;
+    var P=base.concat([alvo]);
+    var F=ols(P), S=ols(base);           /* com e sem o ponto roxo */
+    /* alavancagem de cada ponto */
+    var hs=[];
+    for(i=0;i<P.length;i++)hs.push(1/P.length+Math.pow(P[i].x-F.mx,2)/F.sxx);
+    /* resíduo e Cook do alvo */
+    var ea=alvo.y-(F.a+F.b*alvo.x), ha=hs[P.length-1];
+    var s2=F.sse/(P.length-2);
+    var cook=(ea*ea/(2*s2))*(ha/Math.pow(1-ha,2));
+    /* reta sem o alvo */
+    dash(g,1);seg(g,mm.X(XR[0]),mm.Y(S.a+S.b*XR[0]),mm.X(XR[1]),mm.Y(S.a+S.b*XR[1]),CL.tx2,1.8);dash(g,0);
+    /* reta com o alvo */
+    seg(g,mm.X(XR[0]),mm.Y(F.a+F.b*XR[0]),mm.X(XR[1]),mm.Y(F.a+F.b*XR[1]),CL.line,2.6);
+    /* x barra */
+    dash(g,1);g.globalAlpha=.5;seg(g,mm.X(F.mx),M.t,mm.X(F.mx),cv.h-M.b,CL.tx3,1);g.globalAlpha=1;dash(g,0);
+    T(g,'x̄',mm.X(F.mx)+5,M.t+12,CL.tx3,10);
+    /* pontos, raio ∝ alavancagem */
+    for(i=0;i<base.length;i++){
+      var r=mostra?(3+hs[i]*16):4;
+      dot(g,mm.X(base[i].x),mm.Y(base[i].y),r,CL.warn,'#fff');
+    }
+    var ra=mostra?(3.5+ha*16):5;
+    dot(g,mm.X(alvo.x),mm.Y(alvo.y),ra+1.5,CL.grad,'#fff');
+    /* resíduo do alvo */
+    seg(g,mm.X(alvo.x),mm.Y(alvo.y),mm.X(alvo.x),mm.Y(F.a+F.b*alvo.x),CL.red,2);
+    T(g,'— com o ponto',M.l+9,M.t+15,CL.line,10.5);
+    T(g,'-- sem o ponto',M.l+9,M.t+30,CL.tx2,10.5);
+    var lim=2*2/P.length;
+    out.innerHTML='ponto roxo: h<sub>ii</sub> = <b'+(ha>lim?' style="color:var(--danger)"':'')+'>'+fmt(ha,3)+
+      '</b> (limiar 2p/n = '+fmt(lim,3)+') · resíduo = <b>'+fmt(ea,2)+
+      '</b> · Cook = <b'+(cook>1?' style="color:var(--danger)"':'')+'>'+fmt(cook,3)+'</b><br>'+
+      'inclinação com ele <b>'+fmt(F.b,3)+'</b> · sem ele <b>'+fmt(S.b,3)+'</b> · deslocamento <b>'+
+      fmt(Math.abs(F.b-S.b),3)+'</b>';
+  }
+  cv.draw=pinta; reset();
+})();
+
+/* ========== DEMO 02 — banda de confiança ========== */
+(function(){
+  var cv=C('d2',380); if(!cv)return;
+  var M={l:48,r:16,t:16,b:40},XR=[-1,11],YR=[-4,30];
+  var out=document.getElementById('d2o');
+  /* t de Student, cauda 0,975, por expansão de Cornish–Fisher.
+     Fixar t = 2 erraria a banda em 28% com n = 6 e o slider chega lá. */
+  function t975(df){
+    var z=1.9599639845, z3=z*z*z, z5=z3*z*z, z7=z5*z*z;
+    return z + (z3+z)/(4*df) + (5*z5+16*z3+3*z)/(96*df*df)
+             + (3*z7+19*z5+17*z3-15*z)/(384*df*df*df);
+  }
+  var sn=document.getElementById('d2n'),snv=document.getElementById('d2nv'),
+      ss=document.getElementById('d2s'),ssv=document.getElementById('d2sv'),
+      sp=document.getElementById('d2p');
+  [sn,ss].forEach(function(e){e.addEventListener('input',pinta)});
+  sp.addEventListener('change',pinta);
+
+  function pinta(){
+    var n=parseInt(sn.value,10),sg=parseFloat(ss.value);
+    snv.textContent=n; ssv.textContent=fmt(sg,1);
+    var g=cv.g;clr(cv);
+    axes(cv,M,XR,YR,'x','y',[0,2,4,6,8,10],[0,10,20,30]);
+    var mm=mapper(cv,M,XR,YR),R=RNG(99),P=[],i;
+    for(i=0;i<n;i++){var x=i/(n-1)*10;P.push({x:x,y:2+1.8*x+R.g()*sg})}
+    var F=ols(P), s2=F.sse/(n-2), s=Math.sqrt(s2);
+    var t=t975(n-2);
+    function hx(x){return 1/n+Math.pow(x-F.mx,2)/F.sxx}
+    /* banda de predição (mais larga) primeiro, para ficar por baixo */
+    var xs=[],i2;
+    for(i2=0;i2<=120;i2++)xs.push(XR[0]+(XR[1]-XR[0])*i2/120);
+    function faixa(mult,cor,alfa){
+      g.globalAlpha=alfa;g.fillStyle=cor;g.beginPath();
+      for(i2=0;i2<xs.length;i2++){var x=xs[i2],yy=F.a+F.b*x+t*s*Math.sqrt(mult+hx(x));
+        i2?g.lineTo(mm.X(x),mm.Y(yy)):g.moveTo(mm.X(x),mm.Y(yy))}
+      for(i2=xs.length-1;i2>=0;i2--){var x2=xs[i2],y2=F.a+F.b*x2-t*s*Math.sqrt(mult+hx(x2));
+        g.lineTo(mm.X(x2),mm.Y(y2))}
+      g.closePath();g.fill();g.globalAlpha=1;
+    }
+    if(sp.checked)faixa(1,CL.warn,.18);
+    faixa(0,CL.line,.22);
+    seg(g,mm.X(XR[0]),mm.Y(F.a+F.b*XR[0]),mm.X(XR[1]),mm.Y(F.a+F.b*XR[1]),CL.line,2.4);
+    for(i=0;i<P.length;i++)dot(g,mm.X(P[i].x),mm.Y(P[i].y),3.2,CL.warn);
+    dash(g,1);g.globalAlpha=.55;seg(g,mm.X(F.mx),M.t,mm.X(F.mx),cv.h-M.b,CL.tx3,1);g.globalAlpha=1;dash(g,0);
+    T(g,'x̄',mm.X(F.mx)+5,M.t+12,CL.tx3,10);
+    var w0=2*t*s*Math.sqrt(hx(F.mx)), w10=2*t*s*Math.sqrt(hx(10));
+    out.innerHTML='n = <b>'+n+'</b> · s = <b>'+fmt(s,2)+'</b> · largura da banda da média: em x̄ <b>'+
+      fmt(w0,2)+'</b>, em x = 10 <b>'+fmt(w10,2)+'</b> — <b>'+fmt(w10/w0,1)+'×</b> mais larga na ponta.';
+  }
+  cv.draw=pinta; pinta();
+})();
+
+/* ========== DEMO 03 — a nuvem de estimativas ========== */
+(function(){
+  var cv=C('d3',400); if(!cv)return;
+  /* margem inferior larga: a faixa da soma vive abaixo do gráfico, não sobre os rótulos */
+  var M={l:52,r:16,t:16,b:112},WR=[-1.5,3.5];
+  var out=document.getElementById('d3o');
+  var sr=document.getElementById('d3r'),srv=document.getElementById('d3rv');
+  var nuvem=[],semente=1;
+  sr.addEventListener('input',function(){srv.textContent=fmt(parseFloat(sr.value),2);nuvem=[];pinta()});
+  document.getElementById('d3g').addEventListener('click',function(){amostra(50);pinta()});
+  document.getElementById('d3c').addEventListener('click',function(){nuvem=[];pinta()});
+
+  /* OLS de 2 atributos + intercepto, por equações normais 3x3 (Cramer é suficiente aqui) */
+  function ajusta(X1,X2,Y){
+    var n=X1.length,i,S=[0,0,0,0,0,0,0,0,0],b=[0,0,0];
+    for(i=0;i<n;i++){
+      var a0=1,a1=X1[i],a2=X2[i],y=Y[i];
+      S[0]+=a0*a0;S[1]+=a0*a1;S[2]+=a0*a2;
+      S[4]+=a1*a1;S[5]+=a1*a2;S[8]+=a2*a2;
+      b[0]+=a0*y;b[1]+=a1*y;b[2]+=a2*y;
+    }
+    S[3]=S[1];S[6]=S[2];S[7]=S[5];
+    function det3(m){return m[0]*(m[4]*m[8]-m[5]*m[7])-m[1]*(m[3]*m[8]-m[5]*m[6])+m[2]*(m[3]*m[7]-m[4]*m[6])}
+    var D=det3(S); if(Math.abs(D)<1e-9)return null;
+    function sub(c){var m=S.slice();m[c]=b[0];m[c+3]=b[1];m[c+6]=b[2];return det3(m)/D}
+    return [sub(0),sub(1),sub(2)];
+  }
+  function amostra(k){
+    var r=parseFloat(sr.value),n=60;
+    for(var t=0;t<k;t++){
+      var R=RNG(semente++),X1=[],X2=[],Y=[],i;
+      for(i=0;i<n;i++){
+        var z1=R.g(),z2=R.g();
+        var a=z1, b2=r*z1+Math.sqrt(1-r*r)*z2;
+        X1.push(a);X2.push(b2);
+        Y.push(1.0*a+1.0*b2+R.g()*1.0);     /* verdade: w1 = w2 = 1 */
+      }
+      var w=ajusta(X1,X2,Y);
+      if(w)nuvem.push({w1:w[1],w2:w[2]});
+    }
+  }
+  function pinta(){
+    var g=cv.g;clr(cv);
+    var M2={l:M.l,r:M.r,t:M.t,b:M.b};
+    axes(cv,M2,WR,WR,null,'ŵ₂',[-1,0,1,2,3],[-1,0,1,2,3]);
+    T(g,'ŵ₁',(M2.l+cv.w-M2.r)/2,cv.h-M2.b+34,CL.tx2,10.5,'center');
+    var mm=mapper(cv,M2,WR,WR),i;
+    /* linha w1+w2 = 2: a soma que os dados conhecem */
+    dash(g,1);g.globalAlpha=.7;
+    seg(g,mm.X(WR[0]),mm.Y(2-WR[0]),mm.X(WR[1]),mm.Y(2-WR[1]),CL.res,1.6);
+    g.globalAlpha=1;dash(g,0);
+    T(g,'ŵ₁+ŵ₂ = 2',mm.X(2.4),mm.Y(-0.15),CL.res,10);
+    for(i=0;i<nuvem.length;i++){
+      g.globalAlpha=.45;dot(g,mm.X(nuvem[i].w1),mm.Y(nuvem[i].w2),3,CL.line);g.globalAlpha=1;
+    }
+    /* alvo */
+    g.strokeStyle=CL.grad;g.lineWidth=2.4;
+    g.beginPath();g.moveTo(mm.X(1)-8,mm.Y(1));g.lineTo(mm.X(1)+8,mm.Y(1));
+    g.moveTo(mm.X(1),mm.Y(1)-8);g.lineTo(mm.X(1),mm.Y(1)+8);g.stroke();
+    /* barra da soma, no rodapé */
+    var y0=cv.h-52, x0=M2.l, x1=cv.w-M2.r;
+    T(g,'soma ŵ₁+ŵ₂ de cada amostra',x0,y0-9,CL.tx3,10);
+    seg(g,x0,y0+8,x1,y0+8,CL.grid,1);
+    var SR=[1.2,2.8];
+    for(i=0;i<nuvem.length;i++){
+      var s=nuvem[i].w1+nuvem[i].w2;
+      var px=x0+(Math.max(SR[0],Math.min(SR[1],s))-SR[0])/(SR[1]-SR[0])*(x1-x0);
+      g.globalAlpha=.5;dot(g,px,y0+8,2.5,CL.res);g.globalAlpha=1;
+    }
+    var pt=x0+(2-SR[0])/(SR[1]-SR[0])*(x1-x0);
+    seg(g,pt,y0+2,pt,y0+14,CL.grad,2);
+    T(g,'1,2',x0,y0+26,CL.tx3,9.5);T(g,'2,0',pt,y0+26,CL.tx3,9.5,'center');T(g,'2,8',x1,y0+26,CL.tx3,9.5,'right');
+    /* estatísticas */
+    if(nuvem.length>1){
+      var m1=0,m2=0,ms=0;
+      for(i=0;i<nuvem.length;i++){m1+=nuvem[i].w1;m2+=nuvem[i].w2;ms+=nuvem[i].w1+nuvem[i].w2}
+      m1/=nuvem.length;m2/=nuvem.length;ms/=nuvem.length;
+      var v1=0,vs=0;
+      for(i=0;i<nuvem.length;i++){v1+=Math.pow(nuvem[i].w1-m1,2);vs+=Math.pow(nuvem[i].w1+nuvem[i].w2-ms,2)}
+      var sd1=Math.sqrt(v1/nuvem.length), sds=Math.sqrt(vs/nuvem.length);
+      var r=parseFloat(sr.value), vif=1/(1-r*r);
+      out.innerHTML=nuvem.length+' amostras · desvio de <b>ŵ₁</b> sozinho = <b>'+fmt(sd1,3)+
+        '</b> · desvio da <b>soma</b> = <b>'+fmt(sds,3)+'</b> · razão <b>'+fmt(sd1/sds,1)+
+        '×</b> &nbsp;·&nbsp; VIF = 1/(1−r²) = <b>'+fmt(vif,2)+'</b>';
+    } else {
+      out.innerHTML='Clique <b>+50 amostras</b>. Cada ponto é um ajuste completo sobre uma amostra nova de n = 60.';
+    }
+  }
+  cv.draw=pinta; amostra(50); pinta();
+})();
+
+</script>
+</body>
+</html>

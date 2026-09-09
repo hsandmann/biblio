@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Regressão linear: da reta ao gradiente — aula e laboratório</title>
+<style>
+:root{
+  /* ---- superfícies ---- */
+  --paper:#EBEEE8; --paper-2:#F7F8F4; --card:#FFFFFF; --code:#F2F5F0;
+  /* ---- tinta ---- */
+  --ink:#13242B; --ink-soft:#4C5F66; --ink-faint:#849498;
+  /* ---- acentos: um por ideia ---- */
+  --hydro:#1F6B8E;      /* a reta / mínimos quadrados */
+  --revision:#7A2E86;   /* o gradiente */
+  --veg:#5A7A3F;        /* resíduos */
+  --contour:#A8763F; --danger:#9E3B2E;
+  /* ---- linhas ---- */
+  --rule:rgba(19,36,43,.14); --rule-strong:rgba(19,36,43,.30);
+  --canvas-grid:#DDE4DC;
+  /* ---- tipografia ---- */
+  --display:'Archivo',system-ui,-apple-system,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --rail:250px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.66;letter-spacing:.002em;-webkit-font-smoothing:antialiased}
+img,canvas{max-width:100%}
+a{color:var(--hydro);text-underline-offset:3px;text-decoration-thickness:1px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2.5px solid var(--revision);outline-offset:3px}
+
+/* ---------- RAIL ---------- */
+.rail{position:fixed;inset:0 auto 0 0;width:var(--rail);background:var(--paper-2);border-right:1px solid var(--rule-strong);padding:22px 0 40px;overflow-y:auto;z-index:40}
+.rail__brand{padding:0 18px 14px;border-bottom:1px solid var(--rule)}
+.rail__mark{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--contour);display:block;margin-bottom:6px}
+.rail__title{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.22;letter-spacing:-.008em;margin:0}
+.rail__sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:6px;letter-spacing:.04em}
+.rail nav{padding:12px 0 0}
+.rail h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);margin:16px 18px 6px;font-weight:600}
+.rail a{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;padding:6px 18px;font-family:var(--display);font-weight:500;font-size:12.8px;line-height:1.34;color:var(--ink-soft);text-decoration:none;border-left:2.5px solid transparent}
+.rail a b{font-family:var(--mono);font-weight:500;font-size:10.5px;color:var(--contour)}
+.rail a:hover{color:var(--ink);background:rgba(31,107,142,.06)}
+.rail a.on{color:var(--revision);border-left-color:var(--revision);background:rgba(122,46,134,.06)}
+.rail a.on b{color:var(--revision)}
+.rail__foot{padding:18px 18px 0;margin-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6}
+.railtoggle{display:none}
+
+/* ---------- LAYOUT ---------- */
+.wrap{margin-left:var(--rail)}
+.col{max-width:820px;margin:0 auto;padding:0 34px}
+.col--wide{max-width:1080px}
+
+/* ---------- HERO ---------- */
+.hero{border-bottom:1px solid var(--rule-strong);background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 60%),var(--paper);padding:54px 0 0}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--contour);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:700;letter-spacing:-.022em;line-height:1.02;font-size:clamp(34px,5.4vw,58px);margin:0 0 18px}
+h1 em{font-style:normal;color:var(--revision)}
+.deck{font-size:19px;line-height:1.55;color:var(--ink-soft);max-width:58ch;margin:0 0 26px}
+.deck b{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule-strong);margin-top:8px}
+.meta div{flex:1 1 0;min-width:120px;padding:14px 16px 16px;border-right:1px solid var(--rule)}
+.meta div:last-child{border-right:0}
+.meta span{display:block;font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;color:var(--ink)}
+.meta small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:5px}
+
+/* ---------- SECTIONS ---------- */
+section{padding:64px 0 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.aulahead{margin-bottom:30px}
+.aulahead .n{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--revision);display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.aulahead .n::after{content:"";flex:1;height:1px;background:var(--rule-strong)}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(25px,3.2vw,34px);letter-spacing:-.018em;line-height:1.14;margin:0 0 12px}
+h3{font-family:var(--display);font-weight:700;font-size:19.5px;letter-spacing:-.008em;margin:42px 0 10px;scroll-margin-top:20px}
+h3 span{font-family:var(--mono);font-weight:500;font-size:13px;color:var(--contour);margin-right:9px}
+h4{font-family:var(--display);font-weight:600;font-size:15.5px;margin:26px 0 8px;letter-spacing:-.003em}
+p{margin:0 0 15px}
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin-bottom:7px}
+li::marker{color:var(--contour)}
+strong{font-weight:600}
+.lede{font-size:18px;line-height:1.55;color:var(--ink-soft);max-width:60ch}
+.goals{background:var(--paper-2);border:1px solid var(--rule);padding:18px 22px 14px;margin:0 0 8px}
+.goals h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;font-weight:600}
+.goals ul{margin:0;padding-left:18px;font-size:16px}
+
+/* ---------- MATH ---------- */
+.eq{margin:20px 0;padding:14px 18px;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--hydro);font-family:var(--mono);font-size:14.5px;line-height:1.9;overflow-x:auto}
+.eq b{color:var(--hydro);font-weight:600}
+.eq i{font-style:italic;color:var(--ink-soft)}
+.eq .lbl{float:right;font-size:11px;color:var(--ink-faint);letter-spacing:.08em}
+
+/* ---------- CODE ---------- */
+pre{background:var(--code);color:#1B2F36;font-family:var(--mono);font-size:13px;line-height:1.72;padding:16px 18px;overflow-x:auto;margin:0 0 16px;border:1px solid var(--rule);border-left:3px solid var(--hydro)}
+pre b{color:#0F5B7E;font-weight:600}
+pre i{color:#3E6B2F;font-style:normal}
+pre u{color:#7C8C91;text-decoration:none}
+pre em{color:#9A5A17;font-style:normal}
+code{font-family:var(--mono);font-size:.88em;background:rgba(31,107,142,.10);padding:1px 5px;border-radius:2px}
+.filelabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 6px}
+
+/* ---------- FIGURES / DEMOS ---------- */
+figure.fig{margin:24px 0 28px;border:1px solid var(--rule-strong);background:var(--card);padding:14px 14px 11px}
+figure.fig canvas{display:block;width:100%;height:auto;background:#FBFCF9;border:1px solid var(--rule)}
+figure.fig figcaption{font-family:var(--body);font-size:14.5px;line-height:1.55;color:var(--ink-soft);margin-top:11px;border-top:1px solid var(--rule);padding-top:10px}
+figure.fig figcaption b{color:var(--ink);font-weight:600}
+.demohead{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--revision);margin:0 0 9px;font-weight:600}
+.demohead span{color:var(--ink-faint);float:right;letter-spacing:.08em}
+.ctrls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:11px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.ctrls label{display:flex;align-items:center;gap:7px}
+.ctrls input[type=range]{accent-color:var(--hydro);width:130px}
+.ctrls output{color:var(--hydro);font-weight:600;min-width:3.4em;display:inline-block}
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;padding:6px 12px;border:1px solid var(--rule-strong);background:transparent;cursor:pointer;color:var(--ink-soft);transition:.15s}
+.btn:hover{border-color:var(--hydro);color:var(--ink)}
+.btn--on,.btn[aria-pressed="true"]{background:rgba(31,107,142,.13);color:var(--ink);border-color:var(--hydro);box-shadow:inset 2px 0 0 var(--hydro)}
+.btn--go{background:var(--revision);color:#fff;border-color:var(--revision)}
+.btn--go:hover{background:#8f39a0;color:#fff}
+.readout{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.75;margin-top:10px;min-height:1.2em}
+.readout b{color:var(--ink)}
+
+/* ---------- CALLOUTS ---------- */
+.box{border:1px solid var(--rule-strong);border-left-width:3px;padding:15px 19px 12px;margin:20px 0;background:var(--card);font-size:16px}
+.box h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 8px;font-weight:600}
+.box p:last-child,.box ul:last-child{margin-bottom:0}
+.box--obs{border-left-color:var(--veg)} .box--obs h5{color:var(--veg)}
+.box--trap{border-left-color:var(--revision)} .box--trap h5{color:var(--revision)}
+.box--note{border-left-color:var(--hydro)} .box--note h5{color:var(--hydro)}
+.box--warn{border-left-color:var(--danger)} .box--warn h5{color:var(--danger)}
+
+/* ---------- TABLES ---------- */
+.tw{overflow-x:auto;margin:18px 0 22px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-family:var(--mono)}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap}
+thead th{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--rule-strong);font-weight:600}
+tbody tr:hover{background:rgba(31,107,142,.05)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.txt{font-family:var(--body);font-size:15px;line-height:1.55}
+table.txt td{white-space:normal;vertical-align:top}
+caption{caption-side:bottom;text-align:left;font-family:var(--mono);font-size:11px;color:var(--ink-faint);padding-top:9px;line-height:1.6}
+
+/* ---------- EXERCISES ---------- */
+.exwrap{margin:34px 0 10px;border-top:2px solid var(--ink);padding-top:20px}
+.exwrap > h4{margin-top:0;font-size:13px;font-family:var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.ex{border-left:2.5px solid var(--revision);padding:2px 0 2px 18px;margin:0 0 24px}
+.ex__t{font-family:var(--display);font-weight:600;font-size:15.5px;letter-spacing:-.003em;margin:0 0 7px}
+.ex__t b{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--revision);margin-right:8px}
+.ex p{font-size:16px}
+.tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;border:1px solid var(--rule-strong);padding:2px 7px;margin-left:8px;color:var(--ink-faint);vertical-align:2px}
+details{margin-top:10px;border-top:1px dashed var(--rule-strong);padding-top:9px}
+summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hydro);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";font-size:11px}
+details[open] summary::before{content:"▾ "}
+details > div{padding-top:10px;font-size:16px}
+details pre{font-size:12.2px}
+
+.top{display:block;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none;margin:38px 0 0;padding-bottom:6px}
+.top:hover{color:var(--revision)}
+footer{margin-top:60px;border-top:1px solid var(--rule-strong);background:var(--paper-2);padding:36px 0 60px}
+footer .col{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.85}
+
+@media (max-width:1080px){
+  :root{--rail:0px}
+  .rail{position:static;width:auto;border-right:0;border-bottom:1px solid var(--rule-strong)}
+  .rail nav{display:none;max-width:820px;margin:0 auto;padding:8px 20px 16px}
+  .rail nav.open{display:block}
+  .rail__brand{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 34px 14px}
+  .railtoggle{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--rule-strong);background:transparent;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  .rail a{padding:5px 0}
+  .rail__foot{display:none}
+  .col{padding:0 22px}
+}
+@media (max-width:560px){body{font-size:16px}.col{padding:0 16px}.meta div{flex:1 1 50%;border-bottom:1px solid var(--rule)}}
+@media print{
+  .rail,.top,.ctrls,.railtoggle{display:none}
+  .wrap{margin-left:0}
+  body{background:#fff;font-size:11pt}
+  section{padding:22px 0 0;page-break-inside:auto}
+  figure.fig,.box,.ex{page-break-inside:avoid}
+  h2,h3{page-break-after:avoid}
+  details{display:block}
+  details > div{display:block!important}
+  a{color:var(--ink);text-decoration:none}
+}
+
+</style>
+</head>
+<body>
+<script>
+/* Navegação interna resistente a iframe: resolve o alvo pelo id, sem depender da URL. */
+window.__ir=function(a){
+  var id=(a.getAttribute('href')||'').replace(/^.*#/,'');
+  if(!id){window.scrollTo({top:0,behavior:'smooth'});return false}
+  var el=document.getElementById(id);
+  if(el){el.scrollIntoView({behavior:'smooth',block:'start'});return false}
+  return true;
+};
+</script>
+<aside id="rail" class="rail">
+  <div class="rail__brand">
+    <div>
+      <span class="rail__mark">Insper · Machine Learning</span>
+      <p class="rail__title">Regressão linear:<br>da reta ao gradiente</p>
+      <p class="rail__sub">Aula 70 min · Lab 70 min</p>
+    </div>
+    <button id="railtoggle" class="railtoggle">índice</button>
+  </div>
+  <nav>
+    <h4>Aula</h4>
+    <a href="#b0"><b>00</b><span>Panorama</span></a>
+    <a href="#b1"><b>01</b><span>De onde vem a palavra</span></a>
+    <a href="#b2"><b>02</b><span>A reta e o que um coeficiente diz</span></a>
+    <a href="#b3"><b>03</b><span>Por que ao quadrado</span></a>
+    <a href="#b4"><b>04</b><span>A conta à mão</span></a>
+    <a href="#b5"><b>05</b><span>Resíduos: o que sobrou</span></a>
+    <a href="#b6"><b>06</b><span>Métricas e o que elas escondem</span></a>
+    <a href="#b7"><b>07</b><span>Do exato ao gradiente</span></a>
+    <h4>Laboratório</h4>
+    <a href="#L1"><b>L1</b><span>Escrever o OLS</span></a>
+    <a href="#L2"><b>L2</b><span>Os resíduos somam zero</span></a>
+    <a href="#L3"><b>L3</b><span>O ponto que gira a reta</span></a>
+    <a href="#L4"><b>L4</b><span>Escrever o gradiente</span></a>
+    <a href="#L5"><b>L5</b><span>Centrar e medir a diferença</span></a>
+    <h4>Fixação</h4>
+    <a href="#fix"><b>—</b><span>Dez perguntas</span></a>
+    <h4>Fontes</h4>
+    <a href="#ref"><b>—</b><span>Referências</span></a>
+  </nav>
+  <div class="rail__foot">
+    Roteiro de aula.<br>Simuladores rodam algoritmos<br>reais no navegador.
+  </div>
+</aside>
+
+<div class="wrap">
+<header class="hero">
+  <div class="col col--wide">
+    <p class="eyebrow">Machine Learning · Regressão</p>
+    <h1>A reta é o começo.<br><em>O resíduo é a aula.</em></h1>
+    <p class="deck">Ajustar uma reta leva uma linha de código. O que separa quem usa regressão de quem
+    apenas a chama é o que se faz <b>depois</b>: olhar o que a reta errou, descobrir o que esse erro
+    revela e perceber que o mesmo erro, usado de outro jeito, é o mecanismo que treina todo modelo
+    do resto do curso.</p>
+    <div class="meta">
+      <div><span>1886</span><small>o ano da palavra</small></div>
+      <div><span>4</span><small>simuladores</small></div>
+      <div><span>5</span><small>etapas de lab</small></div>
+      <div><span>10</span><small>perguntas</small></div>
+      <div><span>2h20</span><small>aula + lab</small></div>
+    </div>
+  </div>
+</header>
+
+<main class="col">
+
+<section id="b0">
+  <div class="aulahead"><p class="n">00 — 5 min</p><h2>Panorama</h2></div>
+  <p class="lede">Esta aula percorre um caminho só, do começo ao fim, sem desvio: uma reta, o erro
+  que ela deixa e o que fazer com esse erro.</p>
+  <div class="goals">
+    <h5>Ao final você deve conseguir</h5>
+    <ul>
+      <li>explicar por que o método se chama <i>regressão</i> e por que o fenômeno que deu o nome não é uma força;</li>
+      <li>calcular a reta de mínimos quadrados à mão, em cinco pontos, sem biblioteca;</li>
+      <li>ler um gráfico de resíduos e nomear o defeito que ele denuncia;</li>
+      <li>distinguir <i>outlier</i> de <i>alavancagem</i> e dizer por que a segunda é mais perigosa;</li>
+      <li>derivar ∂J/∂w e explicar por que o gradiente é uma soma ponderada pelos erros;</li>
+      <li>mostrar, medindo, por que centrar os dados muda a velocidade da convergência sem mudar a resposta.</li>
+    </ul>
+  </div>
+  <div class="box box--note">
+    <h5>O que já é pré-requisito</h5>
+    <p>Derivada parcial, média e desvio padrão, além do vocabulário de <code>numpy</code>. Nada de álgebra
+    linear além de multiplicar matriz por vetor — a versão matricial aparece, mas o fio condutor é
+    sempre a regressão simples, com um único atributo, onde tudo cabe numa conta de papel.</p>
+  </div>
+</section>
+
+<section id="b1">
+  <div class="aulahead"><p class="n">01 — 10 min</p><h2>De onde vem a palavra</h2></div>
+  <p><a href="https://archive.org/details/nouvellesmthode00legegoog" target="_blank">Legendre publicou os mínimos quadrados em 1805</a>, para ajustar órbitas
+  de cometas — no apêndice <i>Sur la Méthode des moindres quarrés</i>. <a href="https://archive.org/details/bub_gb_ORUOAAAAQAAJ" target="_blank">Gauss
+  disse que já os usava desde 1795</a>. Nenhum dos dois chamou aquilo de <b>regressão</b> — nem teria motivo,
+  já que a palavra significa "andar para trás" e o método não anda para lugar nenhum.</p>
+
+  <p>O nome chegou oitenta anos depois e por acidente. Em 1886 Francis Galton publicou
+  <a href="https://galton.org/essays/1880-1889/galton-1886-jaigi-regression-stature.pdf" target="_blank"><i>Regression towards Mediocrity in Hereditary Stature</i></a>: 928 filhos adultos, as alturas de seus
+  pais e uma pergunta sobre hereditariedade. Pais altos tinham filhos altos, como esperado — mas,
+  em média, <b>os filhos ficavam mais perto da média da população do que os pais estavam</b>. Pais
+  baixos, o mesmo, na outra direção. Galton chamou o efeito de "regressão à mediocridade" e o nome
+  grudou na ferramenta que ele usou para medi-lo.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 01 · regressão à média <span>arraste o marcador · mude r</span></p>
+    <canvas id="c1"></canvas>
+    <div class="ctrls">
+      <label>r <input id="r1" type="range" min="0" max="0.95" step="0.01" value="0.46"><output id="r1v">0,46</output></label>
+      <button class="btn" id="b1a">r de Galton = 0,46</button>
+      <button class="btn" id="b1b">r = 1 (sem regressão)</button>
+    </div>
+    <p class="readout" id="o1"></p>
+    <figcaption>Cada ponto é uma família. A linha tracejada é a <b>identidade</b>: onde os pontos
+    cairiam se o filho repetisse exatamente a altura dos pais. A reta cheia é o ajuste. Ela é
+    <b>sempre mais achatada</b> que a identidade e o segmento vermelho mede o quanto — é esse
+    segmento que Galton chamou de regressão. Com r = 1 os dois se encontram; com r = 0 a previsão
+    vira a média para todo mundo.</figcaption>
+  </figure>
+
+  <p>A inclinação que Galton relatou foi de cerca de dois terços. Vale ver de onde ela sai, porque
+  a fórmula liga duas coisas que os alunos costumam confundir:</p>
+
+  <div class="eq">
+    <span class="lbl">inclinação ≠ correlação</span>
+    <b>w₁</b> = r · (s<sub>y</sub> / s<sub>x</sub>) = 0,46 × (2,52 / 1,80) ≈ <b>0,64</b>
+  </div>
+
+  <p>A correlação é adimensional; a inclinação carrega as unidades. As duas só coincidem quando as
+  dispersões são iguais — que é a situação do simulador acima, escolhida de propósito para você ver
+  a geometria sem a contabilidade das unidades.</p>
+
+  <div class="box box--obs">
+    <h5>Observe · por que 1,80 e não 2,52</h5>
+    <p>Por que os filhos variam <i>mais</i> (2,52) que a média dos pais (1,80)? Não é que os pais
+    sejam um grupo mais uniforme. A <b>média dos pais é a média de duas pessoas</b> e tirar média
+    encolhe a dispersão: dois indivíduos com s ≈ 2,5 dão 2,5/√2 ≈ 1,77 — essencialmente o 1,80
+    publicado. A assimetria da fórmula vem de como a variável x foi construída, não da
+    hereditariedade.</p>
+  </div>
+
+  <div class="box box--trap">
+    <h5>A armadilha · regressão à média não é uma força</h5>
+    <p>Se você regredir <b>pais sobre filhos</b>, essa reta também sai mais achatada. Um filho alto
+    prevê pais mais próximos da média. As duas direções regridem — o que é impossível para uma
+    atração causal: filhos não estão puxando os pais para a média.</p>
+    <p>O que há é aritmética. Toda medida é sinal mais ruído. Uma observação extrema é extrema em
+    parte porque o sinal era alto, em parte porque o ruído ajudou. O sinal se repete na segunda
+    medida; a sorte não. Logo a segunda medida cai mais perto do meio — qualquer que seja a variável
+    que você chame de primeira. É o mesmo mecanismo por trás de:</p>
+    <ul>
+      <li>os alunos com pior nota recebem reforço e melhoram — <b>logo o reforço funciona?</b> Eles melhorariam de qualquer forma;</li>
+      <li>o atleta que sai na capa tem uma temporada seguinte pior (o <i>Sports Illustrated jinx</i>);</li>
+      <li>a clínica trata quem tem a pressão mais alta e vê a pressão cair. Parte é o remédio, parte
+      é regressão à média — e só um grupo de controle separa as duas.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="b2">
+  <div class="aulahead"><p class="n">02 — 5 min</p><h2>A reta e o que um coeficiente diz</h2></div>
+  <p>O modelo prevê um alvo contínuo como soma ponderada dos atributos:</p>
+  <div class="eq">ŷ = w₀ + w₁x₁ + w₂x₂ + … + w<sub>d</sub>x<sub>d</sub><br>
+  <i>em forma matricial, com uma coluna de 1s absorvida em X:</i> &nbsp; <b>ŷ = Xw</b></div>
+  <p><b>w<sub>j</sub></b> é a variação em ŷ por unidade de x<sub>j</sub>, <b>mantendo os demais
+  atributos fixos</b>. Essas últimas cinco palavras carregam mais peso do que aparentam. Leia:</p>
+  <div class="eq">preço = 50000 + <b>3200</b>·área − 1500·idade</div>
+  <p>3200 <b>não</b> quer dizer "apartamento maior custa R$ 3200 a mais por m² nesta cidade". Quer
+  dizer: <i>entre apartamentos de mesma idade</i>, um m² a mais está associado a R$ 3200 a mais. Se
+  área e idade forem correlacionadas nos seus dados — prédios novos costumam ser maiores — a relação
+  bruta entre área e preço mistura os dois efeitos — e o coeficiente os separa de propósito.</p>
+  <div class="box box--obs">
+    <h5>Observe · coeficiente não é importância</h5>
+    <p>Ordenar atributos por |w<sub>j</sub>| não significa nada sem escala comum: meça a área em km²
+    em vez de m² e o coeficiente cresce um milhão de vezes sem que uma vírgula do modelo mude. Para
+    comparar magnitudes, padronize antes — e, mesmo então, coeficiente grande quer dizer
+    <i>resposta íngreme</i>, não <i>importante</i>.</p>
+  </div>
+</section>
+
+<section id="b3">
+  <div class="aulahead"><p class="n">03 — 8 min</p><h2>Por que ao quadrado</h2></div>
+  <p>Falta uma regra para escolher w. Os mínimos quadrados escolhem a reta que minimiza a soma dos
+  resíduos ao quadrado:</p>
+  <div class="eq">J(w) = Σ<sub>i</sub> ( y<sub>i</sub> − ŷ<sub>i</sub> )² = ‖ y − Xw ‖²</div>
+  <p>Duas escolhas estão embutidas aí e as duas poderiam ter sido outras.</p>
+
+  <h4>Por que distâncias verticais</h4>
+  <p>Porque o trabalho do modelo é prever y a partir de x. Um erro é "o quanto errei em y", medido
+  ao longo do eixo y. Minimizar a distância <b>perpendicular</b> é um método diferente e igualmente
+  legítimo — é o que a PCA faz — mas responde a outra pergunta. É também a razão pela qual as duas
+  retas do painel de Galton não coincidem.</p>
+
+  <h4>Por que elevar ao quadrado</h4>
+  <ol>
+    <li>é suave e diferenciável em toda parte, então o cálculo funciona e existe resposta fechada;</li>
+    <li>pune um erro grande mais do que vários pequenos, que costuma ser o comportamento desejado;</li>
+    <li>sob ruído gaussiano, <b>é</b> máxima verossimilhança — a reta de mínimos quadrados é a mais provável.</li>
+  </ol>
+  <p>A razão 2 é também o defeito: elevar ao quadrado deixa o ajuste hipersensível a um único ponto
+  distante. Minimizar Σ|e<sub>i</sub>| dá os desvios absolutos mínimos, mais robustos, ao custo de
+  perder a forma fechada.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 02 · arraste os pontos <span>a reta persegue o mínimo</span></p>
+    <canvas id="c2"></canvas>
+    <div class="ctrls">
+      <button class="btn" id="b2a">↺ reiniciar</button>
+      <label><input type="checkbox" id="b2b"> mostrar os quadrados</label>
+    </div>
+    <p class="readout" id="o2"></p>
+    <figcaption>Arraste qualquer ponto: a reta reajusta a cada quadro, sempre no mínimo de SSE.
+    Ligue <b>mostrar os quadrados</b> e a soma que está sendo minimizada vira literal — é a área
+    total desenhada. Depois arraste um ponto para longe dos demais e veja quanta área uma única
+    observação consegue impor ao resto.</figcaption>
+  </figure>
+</section>
+
+<section id="b4">
+  <div class="aulahead"><p class="n">04 — 10 min</p><h2>A conta à mão</h2></div>
+  <p>Igualando o gradiente a zero, ∇J = −2Xᵀ(y − Xw) = 0, chega-se às <b>equações normais</b>:</p>
+  <div class="eq">XᵀX w = Xᵀy &nbsp;&nbsp;⟹&nbsp;&nbsp; <b>ŵ = (XᵀX)<sup>−1</sup> Xᵀy</b></div>
+  <p>Para um único atributo isso desaba em duas fórmulas curtas:</p>
+  <div class="eq">
+    w₁ = Σ(x<sub>i</sub> − x̄)(y<sub>i</sub> − ȳ) ⁄ Σ(x<sub>i</sub> − x̄)² &nbsp;&nbsp;·&nbsp;&nbsp;
+    w₀ = ȳ − w₁x̄
+  </div>
+  <p>A segunda diz algo que vale guardar: a reta ajustada <b>sempre passa por (x̄, ȳ)</b>. Faça o que
+  fizer com os dados, ela pivota em torno do centro de massa deles.</p>
+
+  <p>Cinco pontos, pequenos o bastante para conferir cada passo no papel:</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th class="num">x</th><th class="num">y</th><th class="num">x − x̄</th><th class="num">y − ȳ</th><th class="num">produto</th><th class="num">(x − x̄)²</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td class="num">2</td><td class="num">−2</td><td class="num">−2,2</td><td class="num">4,4</td><td class="num">4</td></tr>
+        <tr><td class="num">2</td><td class="num">4</td><td class="num">−1</td><td class="num">−0,2</td><td class="num">0,2</td><td class="num">1</td></tr>
+        <tr><td class="num">3</td><td class="num">5</td><td class="num">0</td><td class="num">0,8</td><td class="num">0,0</td><td class="num">0</td></tr>
+        <tr><td class="num">4</td><td class="num">4</td><td class="num">1</td><td class="num">−0,2</td><td class="num">−0,2</td><td class="num">1</td></tr>
+        <tr><td class="num">5</td><td class="num">6</td><td class="num">2</td><td class="num">1,8</td><td class="num">3,6</td><td class="num">4</td></tr>
+        <tr><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"><strong>8,0</strong></td><td class="num"><strong>10</strong></td></tr>
+      </tbody>
+    </table>
+    <caption>x̄ = 3 e ȳ = 4,2. As duas últimas colunas são tudo de que a fórmula precisa.</caption>
+  </div>
+  <div class="eq">w₁ = 8,0 ⁄ 10 = <b>0,8</b> &nbsp;·&nbsp; w₀ = 4,2 − 0,8×3 = <b>1,8</b>
+  &nbsp;&nbsp;⟹&nbsp;&nbsp; ŷ = 1,8 + 0,8x</div>
+
+  <p>Com a reta na mão, os resíduos e<sub>i</sub> = y<sub>i</sub> − ŷ<sub>i</sub>:</p>
+  <div class="tw">
+    <table>
+      <thead><tr><th class="num">x</th><th class="num">y</th><th class="num">ŷ</th><th class="num">e</th><th class="num">e²</th><th class="num">e·x</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td class="num">2</td><td class="num">2,6</td><td class="num">−0,6</td><td class="num">0,36</td><td class="num">−0,6</td></tr>
+        <tr><td class="num">2</td><td class="num">4</td><td class="num">3,4</td><td class="num">0,6</td><td class="num">0,36</td><td class="num">1,2</td></tr>
+        <tr><td class="num">3</td><td class="num">5</td><td class="num">4,2</td><td class="num">0,8</td><td class="num">0,64</td><td class="num">2,4</td></tr>
+        <tr><td class="num">4</td><td class="num">4</td><td class="num">5,0</td><td class="num">−1,0</td><td class="num">1,00</td><td class="num">−4,0</td></tr>
+        <tr><td class="num">5</td><td class="num">6</td><td class="num">5,8</td><td class="num">0,2</td><td class="num">0,04</td><td class="num">1,0</td></tr>
+        <tr><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"><strong>0,0</strong></td><td class="num"><strong>2,40</strong></td><td class="num"><strong>0,0</strong></td></tr>
+      </tbody>
+    </table>
+    <caption>As duas somas em negrito no rodapé não são coincidência — são o assunto do próximo bloco.</caption>
+  </div>
+
+  <div class="box box--obs">
+    <h5>Observe · as duas identidades</h5>
+    <p>Σe<sub>i</sub> = 0 e Σe<sub>i</sub>x<sub>i</sub> = 0 valem para <b>todo</b> ajuste OLS com
+    intercepto. Elas não são propriedades curiosas do exemplo: <b>são</b> as equações normais, uma
+    por parâmetro. Guarde esses dois zeros — eles reaparecem, idênticos, quando derivarmos o
+    gradiente no bloco 07.</p>
+  </div>
+</section>
+
+<section id="b5">
+  <div class="aulahead"><p class="n">05 — 10 min</p><h2>Resíduos: o que sobrou</h2></div>
+  <p>Tudo o que o modelo não explicou está nos resíduos. Lê-los é o hábito de diagnóstico mais útil
+  da regressão e o mais frequentemente pulado.</p>
+  <p>O <b>gráfico de resíduos</b> põe e<sub>i</sub> na vertical contra o previsto ŷ<sub>i</sub> na
+  horizontal. Um gráfico saudável parece não ter nada: uma faixa sem estrutura em torno do zero.
+  Qualquer padrão é o modelo avisando qual suposição acabou de quebrar.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 03 · quatro conjuntos, quatro veredictos <span>diagnostique antes de ler</span></p>
+    <canvas id="c3"></canvas>
+    <div class="ctrls" id="b3btns"></div>
+    <p class="readout" id="o3"></p>
+    <figcaption>O painel de cima é o que você normalmente olharia; o de baixo é o que decide. Repare
+    no R² de cada caso antes de trocar: <b>ele não distingue os quatro</b>. Só o painel inferior
+    distingue.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table class="txt">
+      <thead><tr><th>O que você vê</th><th>O que significa</th><th>O que fazer</th></tr></thead>
+      <tbody>
+        <tr><td>Faixa sem estrutura</td><td>A forma linear serve</td><td>Nada</td></tr>
+        <tr><td>Curva em U ou ∩</td><td>Relação não linear que a reta não acompanha</td><td>Termos polinomiais, ou transformar x</td></tr>
+        <tr><td>Funil</td><td>Heteroscedasticidade: o ruído depende de ŷ</td><td>Transformar y (log), ou mínimos quadrados ponderados</td></tr>
+        <tr><td>Ponto extremo isolado</td><td>Outlier ou alta alavancagem</td><td>Investigar; nunca apagar em silêncio</td></tr>
+        <tr><td>Ondas ao longo do índice</td><td>Erros correlacionados, tipicamente tempo</td><td>Modelo de série temporal; as barras de erro do OLS não valem</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box box--warn">
+    <h5>Cuidado · outlier e alavancagem não são a mesma coisa</h5>
+    <p>Um <b>outlier</b> tem resíduo grande: o modelo errou nele. Um ponto de <b>alta alavancagem</b>
+    fica longe de x̄ ao longo do eixo x e por isso consegue arrastar a reta inteira até si. O caso
+    perigoso é quem tem as duas coisas: ele gira a reta com tanta eficácia que o <i>próprio resíduo
+    acaba pequeno</i>, escondendo o estrago que causou. É o quarto caso do simulador — e é por isso
+    que "descartar os resíduos grandes" é conselho ruim: os piores infratores não têm resíduo
+    grande.</p>
+  </div>
+</section>
+
+<section id="b6">
+  <div class="aulahead"><p class="n">06 — 8 min</p><h2>Métricas e o que elas escondem</h2></div>
+  <p>Toda métrica aqui resume <b>o mesmo vetor de resíduos</b> num número só. Elas discordam porque
+  comprimem de formas diferentes — então leia os nomes por extenso antes das fórmulas.</p>
+  <div class="tw">
+    <table class="txt">
+      <thead><tr><th>Sigla</th><th>Por extenso</th><th>Fórmula</th><th>Unidade</th></tr></thead>
+      <tbody>
+        <tr><td><b>MAE</b></td><td><b>M</b>ean <b>A</b>bsolute <b>E</b>rror — erro absoluto médio</td><td>(1/n)Σ|e<sub>i</sub>|</td><td>a mesma de y</td></tr>
+        <tr><td><b>MSE</b></td><td><b>M</b>ean <b>S</b>quared <b>E</b>rror — erro quadrático médio</td><td>(1/n)Σe<sub>i</sub>²</td><td>y ao quadrado</td></tr>
+        <tr><td><b>RMSE</b></td><td><b>R</b>oot <b>M</b>ean <b>S</b>quared <b>E</b>rror — raiz do erro quadrático médio</td><td>√MSE</td><td>a mesma de y</td></tr>
+        <tr><td><b>R²</b></td><td>coeficiente de determinação</td><td>1 − SQE ⁄ SQT</td><td>nenhuma</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="box box--obs">
+    <h5>Observe · a sigla é a receita</h5>
+    <p>Leia <b>RMSE</b> de trás para frente: <i>Error</i> → <i>Squared</i> → <i>Mean</i> → <i>Root</i>.
+    Pegue o erro, eleve ao quadrado, tire a média, extraia a raiz. Ler o nome ao contrário é escrever
+    o código.</p>
+  </div>
+  <p>Nos cinco pontos do bloco 04, com resíduos −0,6 · 0,6 · 0,8 · −1,0 · 0,2:</p>
+  <div class="eq">
+    MAE = (0,6+0,6+0,8+1,0+0,2) ⁄ 5 = 3,2 ⁄ 5 = <b>0,64</b><br>
+    MSE = (0,36+0,36+0,64+1,00+0,04) ⁄ 5 = 2,40 ⁄ 5 = <b>0,48</b><br>
+    RMSE = √0,48 = <b>0,69</b> &nbsp;·&nbsp; R² = 1 − 2,40 ⁄ 8,80 = <b>0,727</b>
+  </div>
+  <p>Os valores de y iam de 2 a 6, então errar ~0,7 em média é erro relevante. <b>MAE e RMSE são
+  citáveis</b> para quem não é técnico — "erra uns 0,7" — enquanto o MSE é 0,48 <i>unidades ao
+  quadrado</i>, que ninguém diz em voz alta. É para isso que o RMSE existe.</p>
+
+  <h4>MAE ou RMSE? A diferença é um erro grande</h4>
+  <div class="tw">
+    <table class="txt">
+      <thead><tr><th>Modelo</th><th>erros</th><th class="num">MAE</th><th class="num">RMSE</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>2, 2, 2, 2, 2</td><td class="num">2,0</td><td class="num">2,0</td></tr>
+        <tr><td>B</td><td>0, 0, 0, 0, 10</td><td class="num">2,0</td><td class="num"><b>4,47</b></td></tr>
+      </tbody>
+    </table>
+    <caption>MAE idêntico; RMSE mais que o dobro no B, porque o erro 10 vira 100 na soma.</caption>
+  </div>
+  <p>Nenhum dos dois está certo no abstrato — a pergunta é o que <i>o seu problema</i> custa. Atrasar
+  uma entrega em 10 min uma vez costuma ser pior que atrasar 2 min cinco vezes (RMSE); numa previsão
+  de demanda o erro total pode ser o que importa (MAE). Escolha <b>antes</b> de ver os resultados.</p>
+
+  <h4>O R² compara com o modelo mais preguiçoso possível</h4>
+  <p>A <b>SQT</b> (soma de quadrados total) é o erro de ignorar x e prever sempre ȳ. A <b>SQE</b>
+  (soma de quadrados dos erros) é o que a sua reta ainda erra. O R² é a fração da primeira que a
+  segunda eliminou — daí "coeficiente de determinação". Nos cinco pontos, a reta removeu 73% da
+  dispersão. E como r = 0,853, note que 0,853² = 0,727: na regressão <i>simples</i> o R² é mesmo a
+  correlação ao quadrado — é de onde vem o símbolo e morre quando entra um segundo atributo.</p>
+  <div class="box box--trap">
+    <h5>A armadilha · R² negativo e R² que só sobe</h5>
+    <p>Em dados de teste o R² <b>pode ser negativo</b>: significa que o modelo perdeu para a reta
+    horizontal ŷ = ȳ. Sempre ajuste essa baseline constante e reporte-a.</p>
+    <p>No conjunto de <b>treino</b> vale o oposto e é pior: o R² nunca diminui quando você acrescenta
+    um atributo — nem se a coluna for ruído puro. Isso o torna inútil para escolher entre modelos
+    e é a razão de existir o assunto "validação".</p>
+  </div>
+</section>
+
+<section id="b7">
+  <div class="aulahead"><p class="n">07 — 14 min</p><h2>Do exato ao gradiente</h2></div>
+  <p>Temos uma fórmula que resolve tudo de uma vez. Então por que o resto do aprendizado de máquina
+  se dá ao trabalho de iterar?</p>
+  <p>Porque (XᵀX)<sup>−1</sup> deixa de existir na prática. Custa O(d³), o que inviabiliza um milhão
+  de atributos. Não existe quando as colunas são colineares. E não tem equivalente nenhum para os
+  modelos da segunda metade do curso: uma rede neural não tem equações normais. O que <b>generaliza</b>
+  é a ideia por baixo.</p>
+  <p>Repare em como chegamos à forma fechada: escrevemos J(w), tomamos o gradiente e perguntamos
+  onde ele se anula. <b>O gradiente descendente mantém os dois primeiros passos e desiste do
+  terceiro</b>: em vez de resolver ∇J = 0 na álgebra, ele desce a ladeira até chegar lá.</p>
+
+  <p>Escrevendo a perda como média, para a escala não depender de n e derivando:</p>
+  <div class="eq">
+    J(w₀,w₁) = (1/n) Σ ( y<sub>i</sub> − w₀ − w₁x<sub>i</sub> )²<br><br>
+    ∂J/∂w₀ = (1/n) Σ 2e<sub>i</sub>·(−1) &nbsp;=&nbsp; <b>−(2/n) Σ e<sub>i</sub></b><br>
+    ∂J/∂w₁ = (1/n) Σ 2e<sub>i</sub>·(−x<sub>i</sub>) &nbsp;=&nbsp; <b>−(2/n) Σ e<sub>i</sub>x<sub>i</sub></b>
+  </div>
+
+  <p>Duas leituras saem daí e as duas merecem parada.</p>
+  <p><b>A primeira</b>: iguale as duas a zero e você recupera exatamente Σe<sub>i</sub> = 0 e
+  Σe<sub>i</sub>x<sub>i</sub> = 0 — os mesmos dois zeros do rodapé da tabela do bloco 04. A forma
+  fechada e o gradiente são a mesma afirmação, alcançada por dois caminhos.</p>
+  <p><b>A segunda</b>: veja de que o gradiente é feito — uma <b>soma ponderada pelos resíduos</b>.
+  Um ponto que o modelo já acerta contribui com e<sub>i</sub> ≈ 0 e praticamente não vota. Os pontos
+  em que ele erra feio dominam o passo. Então a regra</p>
+  <div class="eq"><b>w ← w − η ∇J(w)</b></div>
+  <p>lê-se, em português: <i>mova cada parâmetro na direção para onde os erros apontam, numa
+  quantidade proporcional ao tamanho deles</i>. É a frase que continua valendo, sem alterar uma
+  vírgula, quando o modelo for uma rede de cem camadas e ∇J vier da retropropagação.</p>
+
+  <figure class="fig">
+    <p class="demohead">Demo 04 · a superfície de erro <span>clique para soltar o palpite inicial</span></p>
+    <canvas id="c4"></canvas>
+    <div class="ctrls">
+      <label>η <input id="r4" type="range" min="0.001" max="0.06" step="0.001" value="0.008"><output id="r4v">0,008</output></label>
+      <button class="btn btn--go" id="b4a">passo</button>
+      <button class="btn" id="b4b">▶ rodar</button>
+      <button class="btn" id="b4c">↺ reiniciar</button>
+      <button class="btn" id="b4d" aria-pressed="false">centrar x</button>
+    </div>
+    <p class="readout" id="o4"></p>
+    <figcaption>À esquerda, J(w₀,w₁) como paisagem: cada ponto do plano é uma reta candidata, a cor
+    é o erro dela, a cruz branca é o ótimo em forma fechada. À direita, a mesma reta desenhada sobre
+    os dados. Rode uma vez como está; depois ligue <b>centrar x</b> e rode de novo. Mesmos dados,
+    mesmo algoritmo e uma diferença de velocidade que não é sutil.</figcaption>
+  </figure>
+
+  <div class="box box--note">
+    <h5>Por que escalonar vem antes de ajustar</h5>
+    <p>Sem centrar, as curvas de nível formam um vale longo e estreito: w₀ e w₁ ficam acoplados,
+    porque mexer na inclinação de uma reta cujos x estão todos longe de zero também balança a altura
+    dela. O gradiente aponta <i>atravessado</i> ao vale, não ao longo dele e o caminho ziguezagueia.
+    Centrado, o vale vira tigela e os mesmos passos vão quase direto.</p>
+    <p>Repare no que <b>não</b> mudou: a cruz branca continua no mesmo lugar relativo e a reta final
+    é a mesma. A forma fechada é indiferente a isso. Quem sofre é a rota iterativa — e é por isso que
+    padronizar atributos não é arrumação cosmética, é remodelar a superfície que o otimizador terá de
+    percorrer.</p>
+  </div>
+</section>
+
+<section id="L1">
+  <div class="aulahead"><p class="n">Laboratório — 70 min</p><h2>Cinco etapas</h2></div>
+  <p class="lede">Cada etapa termina num número de conferência. Rode, confira e só então siga: se
+  não bater, o erro está antes.</p>
+  <div class="box box--note">
+    <h5>Antes de começar</h5>
+    <p>Só <code>numpy</code> e <code>matplotlib</code>. O <code>scikit-learn</code> aparece apenas no
+    fim de L1 e só para confirmar que a sua conta bate com a dele.</p>
+  </div>
+
+  <div class="exwrap">
+    <h4>L1 · Escrever o OLS e conferir com a conta à mão</h4>
+    <div class="ex">
+      <p class="ex__t"><b>a</b>Implemente a fórmula fechada da regressão simples<span class="tag">15 min</span></p>
+      <p>Escreva <code>ajusta(x, y)</code> devolvendo (w₀, w₁) pelas duas fórmulas do bloco 04 —
+      sem <code>polyfit</code>, sem <code>lstsq</code>. Rode nos cinco pontos
+      <code>x = [1,2,3,4,5]</code>, <code>y = [2,4,5,4,6]</code>.</p>
+      <p><b>Conferência:</b> w₁ = 0,8 e w₀ = 1,8, exatamente.</p>
+      <details><summary>abrir o esqueleto</summary><div>
+<pre><b>import</b> numpy <b>as</b> np
+
+<b>def</b> <em>ajusta</em>(x, y):
+    x, y = np.asarray(x, <em>float</em>), np.asarray(y, <em>float</em>)
+    xb, yb = x.<em>mean</em>(), y.<em>mean</em>()
+    <u># w1 = Sxy / Sxx ; w0 = ybar - w1*xbar</u>
+    ...
+    <b>return</b> w0, w1</pre>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>b</b>Compare com o sklearn</p>
+      <p>Ajuste o mesmo conjunto com <code>LinearRegression</code> e verifique que
+      <code>coef_</code> e <code>intercept_</code> coincidem com os seus até a última casa.
+      Se divergirem, o erro é seu — a fórmula é exata, não aproximada.</p>
+    </div>
+  </div>
+</section>
+
+<section id="L2">
+  <div class="exwrap">
+    <h4>L2 · Os resíduos somam zero</h4>
+    <div class="ex">
+      <p class="ex__t"><b>a</b>Verifique as duas identidades<span class="tag">10 min</span></p>
+      <p>Com a reta de L1, calcule <code>e = y - (w0 + w1*x)</code> e imprima
+      <code>e.sum()</code> e <code>(e*x).sum()</code>.</p>
+      <p><b>Conferência:</b> ambos zero a menos de erro de ponto flutuante (use
+      <code>np.allclose(..., 0)</code>, não <code>== 0</code>).</p>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>b</b>Quebre a primeira identidade de propósito</p>
+      <p>Reajuste <b>sem intercepto</b> (force w₀ = 0, com w₁ = Σxy/Σx²) e recalcule as duas somas.
+      Uma delas deixa de ser zero.</p>
+      <p><b>Responda:</b> qual delas e por quê? Relacione com a frase "uma equação normal por
+      parâmetro".</p>
+      <details><summary>abrir a resposta</summary><div>
+        <p>Σe<sub>i</sub> deixa de ser zero; Σe<sub>i</sub>x<sub>i</sub> continua zero. Cada equação
+        normal vem de derivar em relação a um parâmetro. Sem w₀ não existe a derivada ∂J/∂w₀, logo
+        não existe a condição Σe = 0. Sobra apenas a de w₁. Consequência prática: um modelo sem
+        intercepto tem resíduos com média diferente de zero — ele erra sistematicamente para um lado
+        e o R² usual deixa de ser interpretável.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="L3">
+  <div class="exwrap">
+    <h4>L3 · O ponto que gira a reta</h4>
+    <div class="ex">
+      <p class="ex__t"><b>a</b>Alavancagem, medida<span class="tag">15 min</span></p>
+      <p>Gere <code>x = np.linspace(0, 10, 40)</code> e <code>y = 3 + 1.7*x + ruído(σ=1,5)</code> com
+      semente fixa. Ajuste e guarde (w₀, w₁).</p>
+      <p>Agora mova <b>um único ponto</b> em y, 15 unidades para baixo e reajuste. Faça isso duas
+      vezes: primeiro com o ponto do <i>meio</i> (x ≈ 5), depois com o da <i>ponta</i> (x ≈ 10).</p>
+      <p><b>Conferência:</b> a variação em w₁ é várias vezes maior no caso da ponta, mesmo o
+      deslocamento em y sendo idêntico.</p>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>b</b>O resíduo mente</p>
+      <p>Para cada um dos dois casos, imprima o resíduo <i>do ponto que você moveu</i>.</p>
+      <p><b>Responda:</b> qual dos dois pontos tem o maior resíduo? E qual dos dois causou mais
+      estrago na reta? Explique por que um filtro do tipo "descarte |e| &gt; 3σ" pegaria o ponto
+      errado.</p>
+    </div>
+  </div>
+</section>
+
+<section id="L4">
+  <div class="exwrap">
+    <h4>L4 · Escrever o gradiente descendente</h4>
+    <div class="ex">
+      <p class="ex__t"><b>a</b>Implemente a descida<span class="tag">20 min</span></p>
+      <p>Use as duas derivadas do bloco 07. Comece de (w₀, w₁) = (0, 0), com η = 0,01, por 2000
+      iterações, sobre os dados de L3 (sem o ponto movido). Guarde J a cada passo.</p>
+      <p><b>Conferência:</b> os w finais devem bater com a forma fechada de L1 nas três primeiras
+      casas decimais.</p>
+      <details><summary>abrir o esqueleto</summary><div>
+<pre><b>def</b> <em>descida</em>(x, y, eta=<em>0.01</em>, iters=<em>2000</em>):
+    w0 = w1 = <em>0.0</em>; n = <em>len</em>(x); hist = []
+    <b>for</b> _ <b>in</b> <em>range</em>(iters):
+        e = y - (w0 + w1*x)
+        g0 = -<em>2</em>/n * e.<em>sum</em>()
+        g1 = -<em>2</em>/n * (e*x).<em>sum</em>()
+        w0 -= eta*g0; w1 -= eta*g1
+        hist.<em>append</em>((e**<em>2</em>).<em>mean</em>())
+    <b>return</b> w0, w1, hist</pre>
+      </div></details>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>b</b>Ache o η que diverge</p>
+      <p>Aumente η até J crescer em vez de cair. Reporte o maior η que ainda converge, com duas casas.</p>
+      <p><b>Responda:</b> o que acontece com J nas primeiras dez iterações logo <i>acima</i> desse
+      limiar? Cai e depois sobe, ou sobe desde o começo?</p>
+    </div>
+  </div>
+</section>
+
+<section id="L5">
+  <div class="exwrap">
+    <h4>L5 · Centrar e medir a diferença</h4>
+    <div class="ex">
+      <p class="ex__t"><b>a</b>O mesmo problema, condicionado<span class="tag">10 min</span></p>
+      <p>Repita L4 com <code>xc = x - x.mean()</code>, mesmo η, mesmas iterações. Plote as duas
+      curvas de J numa figura só, em escala logarítmica no eixo y.</p>
+      <p><b>Conferência:</b> a versão centrada chega ao J ótimo em ordens de grandeza menos
+      iterações. Reporte quantas iterações cada versão levou para chegar a 1% acima do J ótimo.</p>
+    </div>
+    <div class="ex">
+      <p class="ex__t"><b>b</b>A reta não mudou</p>
+      <p>Converta os w da versão centrada de volta para a escala original
+      (w₁ é o mesmo; w₀<sup>orig</sup> = w₀<sup>centr</sup> − w₁·x̄) e confirme que as duas retas
+      coincidem.</p>
+      <p><b>Responda:</b> em uma frase, o que exatamente o centramento mudou — e o que ele não mudou?</p>
+      <details><summary>abrir a resposta</summary><div>
+        <p>Mudou o <b>condicionamento</b> do problema: a razão entre o maior e o menor autovalor de
+        XᵀX, que é a excentricidade das curvas de nível. Não mudou nem o mínimo, nem a reta ajustada,
+        nem qualquer previsão. Centrar não é sobre a resposta, é sobre o caminho até ela.</p>
+      </div></details>
+    </div>
+  </div>
+</section>
+
+<section id="fix">
+  <div class="aulahead"><p class="n">Fixação</p><h2>Dez perguntas</h2></div>
+  <p class="lede">Se você responde as dez sem consultar, a aula cumpriu o objetivo.</p>
+  <ol>
+    <li>Por que o método se chama regressão, se ele não regride nada?</li>
+    <li>Galton achou r = 0,46 e inclinação 0,64. Como as duas convivem?</li>
+    <li>Regredir pais sobre filhos também achata a reta. Por que isso derruba a explicação causal?</li>
+    <li>Por que o OLS mede distâncias verticais e não perpendiculares?</li>
+    <li>Cite as três razões para elevar ao quadrado — e a que preço.</li>
+    <li>O que garante que a reta passa por (x̄, ȳ)?</li>
+    <li>Σe = 0 e Σex = 0 são propriedades ou definições? Justifique.</li>
+    <li>Um ponto tem resíduo pequeno e mesmo assim estragou o ajuste. Como isso é possível?</li>
+    <li>Seu R² de teste deu −0,2. O que exatamente isso diz?</li>
+    <li>Centrar x acelerou a convergência em 50×. A reta final mudou? Por quê?</li>
+  </ol>
+  <a class="top" href="#b0" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+
+<section id="ref">
+  <div class="aulahead"><p class="n">Referências</p><h2>As fontes, em primeira mão</h2></div>
+  <p class="lede">Os três textos citados nesta aula estão disponíveis na íntegra. Vale abrir ao menos
+  o apêndice de Legendre e a primeira página de Galton — são curtos; ver o original muda a relação
+  com a fórmula.</p>
+  <ul>
+    <li><b>Legendre, A.-M.</b> <i>Nouvelles méthodes pour la détermination des orbites des comètes</i>.
+    Courcier, 1805. Os mínimos quadrados aparecem no apêndice <i>Sur la Méthode des moindres quarrés</i>,
+    a partir da p. 72. <a href="https://archive.org/details/nouvellesmthode00legegoog" target="_blank">Texto completo (archive.org)</a></li>
+    <li><b>Gauss, C. F.</b> <i>Theoria motus corporum coelestium in sectionibus conicis solem
+    ambientium</i>. Perthes &amp; Besser, 1809. É aqui que Gauss afirma usar o método desde 1795 —
+    origem da disputa de prioridade com Legendre. <a href="https://archive.org/details/bub_gb_ORUOAAAAQAAJ" target="_blank">Texto completo (archive.org)</a></li>
+    <li><b>Galton, F.</b> "Regression towards Mediocrity in Hereditary Stature". <i>Journal of the
+    Anthropological Institute</i> 15 (1886): 246–263. <a href="https://galton.org/essays/1880-1889/galton-1886-jaigi-regression-stature.pdf" target="_blank">PDF (galton.org)</a></li>
+    <li><b>Hanley, J. A.</b> "'Transmuting' Women into Men: Galton's Family Data on Human Stature".
+    <i>The American Statistician</i> 58, n. 3 (2004): 237–243 — de onde vêm os momentos (1,80 e 2,52)
+    usados no bloco 01. <a href="https://doi.org/10.1198/000313004x1558" target="_blank">DOI</a></li>
+    <li><b>Anscombe, F. J.</b> "Graphs in Statistical Analysis". <i>The American Statistician</i> 27,
+    n. 1 (1973): 17–21 — o quarteto. <a href="https://doi.org/10.1080/00031305.1973.10478966" target="_blank">DOI</a></li>
+  </ul>
+  <a class="top" href="#b0" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+</main>
+
+<footer>
+  <div class="col">
+    Insper · Machine Learning · Regressão linear — roteiro de aula.<br>
+    Simuladores em JavaScript, sem dependências: todo cálculo roda no navegador.<br>
+    Companheiro da página da disciplina; não a substitui.
+  </div>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ================= utilidades ================= */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function RNG(s){var f=mulberry(s);f.g=function(){var u=0,v=0;while(u===0)u=f();while(v===0)v=f();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v)};return f}
+
+var CL={},CANV=[];
+function cssv(n,f){var v=getComputedStyle(document.documentElement).getPropertyValue(n).trim();return v||f||'#8B99A6'}
+function syncTheme(){
+  /* fonte da verdade é o :root; os canvases só leem de lá */
+  CL.line=cssv('--hydro'); CL.grad=cssv('--revision'); CL.res=cssv('--veg');
+  CL.warn=cssv('--contour'); CL.red=cssv('--danger');
+  CL.tx=cssv('--ink'); CL.tx2=cssv('--ink-soft'); CL.tx3=cssv('--ink-faint');
+  CL.grid=cssv('--canvas-grid'); CL.bg='#FBFCF9';
+}
+syncTheme();
+
+function C(id,h){
+  var el=document.getElementById(id); if(!el)return null;
+  el.style.height=h+'px';
+  var o={el:el,h:h,g:el.getContext('2d'),w:300,draw:null};
+  o.fit=function(){var dpr=Math.min(window.devicePixelRatio||1,2);o.w=el.clientWidth||600;
+    el.width=Math.round(o.w*dpr);el.height=Math.round(h*dpr);o.g.setTransform(dpr,0,0,dpr,0,0)};
+  o.fit();
+  var t=null;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(function(){
+    try{o.fit();if(o.draw)o.draw()}catch(e){}},120)});
+  CANV.push(o); return o;
+}
+function clr(o){o.g.fillStyle=CL.bg;o.g.fillRect(0,0,o.w,o.h)}
+function T(g,s,x,y,c,sz,al,mono){g.fillStyle=c;g.font=(sz||11)+'px '+(mono===false?'system-ui,sans-serif':'ui-monospace,Menlo,Consolas,monospace');g.textAlign=al||'left';g.textBaseline='alphabetic';g.fillText(s,x,y)}
+function fmt(v,n){if(!isFinite(v))return '∞';return v.toFixed(n===undefined?2:n).replace('.',',')}
+function dash(g,on){g.setLineDash(on?[5,4]:[])}
+function seg(g,x1,y1,x2,y2,c,w){g.strokeStyle=c;g.lineWidth=w||1;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke()}
+function dot(g,x,y,r,c,ring){g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,6.2832);g.fill();
+  if(ring){g.strokeStyle=ring;g.lineWidth=1.2;g.stroke()}}
+
+/* eixos simples com margens */
+function axes(o,M,xr,yr,xlab,ylab,xt,yt){
+  var g=o.g;
+  g.strokeStyle=CL.grid;g.lineWidth=1;
+  var i;
+  if(xt)for(i=0;i<xt.length;i++){var X=M.l+(xt[i]-xr[0])/(xr[1]-xr[0])*(o.w-M.l-M.r);
+    seg(g,X,M.t,X,o.h-M.b,CL.grid,1);T(g,fmt(xt[i],xt.dec===undefined?0:xt.dec),X,o.h-M.b+15,CL.tx3,10,'center')}
+  if(yt)for(i=0;i<yt.length;i++){var Y=o.h-M.b-(yt[i]-yr[0])/(yr[1]-yr[0])*(o.h-M.t-M.b);
+    seg(g,M.l,Y,o.w-M.r,Y,CL.grid,1);T(g,fmt(yt[i],yt.dec===undefined?0:yt.dec),M.l-6,Y+3.5,CL.tx3,10,'right')}
+  g.strokeStyle=CL.tx3;g.lineWidth=1;g.strokeRect(M.l,M.t,o.w-M.l-M.r,o.h-M.t-M.b);
+  if(xlab)T(g,xlab,(M.l+o.w-M.r)/2,o.h-4,CL.tx2,10.5,'center');
+  if(ylab){g.save();g.translate(11,(M.t+o.h-M.b)/2);g.rotate(-Math.PI/2);T(g,ylab,0,0,CL.tx2,10.5,'center');g.restore()}
+}
+function mapper(o,M,xr,yr){
+  return {
+    X:function(v){return M.l+(v-xr[0])/(xr[1]-xr[0])*(o.w-M.l-M.r)},
+    Y:function(v){return o.h-M.b-(v-yr[0])/(yr[1]-yr[0])*(o.h-M.t-M.b)},
+    iX:function(p){return xr[0]+(p-M.l)/(o.w-M.l-M.r)*(xr[1]-xr[0])},
+    iY:function(p){return yr[0]+(o.h-M.b-p)/(o.h-M.t-M.b)*(yr[1]-yr[0])}
+  };
+}
+/* OLS simples, usado por vários demos */
+function ols(P){
+  var n=P.length,i,mx=0,my=0;
+  for(i=0;i<n;i++){mx+=P[i].x;my+=P[i].y} mx/=n;my/=n;
+  var sxy=0,sxx=0,syy=0;
+  for(i=0;i<n;i++){sxy+=(P[i].x-mx)*(P[i].y-my);sxx+=(P[i].x-mx)*(P[i].x-mx);syy+=(P[i].y-my)*(P[i].y-my)}
+  var b=sxx>1e-12?sxy/sxx:0, a=my-b*mx, sse=0;
+  for(i=0;i<n;i++){var e=P[i].y-(a+b*P[i].x);sse+=e*e}
+  return {a:a,b:b,sse:sse,sst:syy,r2:syy>1e-12?1-sse/syy:0,mx:mx,my:my,sxx:sxx,syy:syy,sxy:sxy,n:n};
+}
+function pos(o,ev){var r=o.el.getBoundingClientRect();var e=ev.touches?ev.touches[0]:ev;
+  return {x:(e.clientX-r.left)*(o.w/r.width),y:(e.clientY-r.top)*(o.h/r.height)}}
+
+/* rail: marca a seção visível */
+window.addEventListener('DOMContentLoaded',function(){
+  var links=[].slice.call(document.querySelectorAll('.rail a[href^="#"]'));
+  var secs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))});
+  function upd(){
+    var best=0,bd=1e9;
+    for(var i=0;i<secs.length;i++){if(!secs[i])continue;
+      var d=Math.abs(secs[i].getBoundingClientRect().top-90);
+      if(d<bd){bd=d;best=i}}
+    links.forEach(function(a,i){a.classList.toggle('on',i===best)});
+  }
+  window.addEventListener('scroll',upd,{passive:true});upd();
+  var tg=document.getElementById('railtoggle');
+  if(tg)tg.addEventListener('click',function(){document.querySelector('.rail nav').classList.toggle('open')});
+});
+
+/* ========== DEMO 01 — regressão à média ========== */
+(function(){
+  var cv=C('c1',360); if(!cv)return;
+  var MU=170,SD=7,LO=MU-3.2*SD,HI=MU+3.2*SD;
+  var M={l:52,r:16,t:16,b:38};
+  var R=RNG(1886),F=[],i;
+  for(i=0;i<220;i++)F.push({zp:R.g(),ze:R.g()});
+  var sel=MU+1.6*SD, rr=0.46, drag=false;
+  var sl=document.getElementById('r1'),ov=document.getElementById('r1v'),out=document.getElementById('o1');
+
+  function setr(v){rr=v;sl.value=v;ov.textContent=fmt(v,2);pinta()}
+  sl.addEventListener('input',function(){setr(parseFloat(sl.value))});
+  document.getElementById('b1a').addEventListener('click',function(){setr(0.46)});
+  document.getElementById('b1b').addEventListener('click',function(){setr(1)});
+  sl.max="1";
+
+  function grab(ev){var p=pos(cv,ev);var m=mapper(cv,M,[LO,HI],[LO,HI]);
+    sel=Math.max(LO+2,Math.min(HI-2,m.iX(p.x)));pinta()}
+  cv.el.addEventListener('pointerdown',function(e){drag=true;grab(e)});
+  cv.el.addEventListener('pointermove',function(e){if(drag)grab(e)});
+  window.addEventListener('pointerup',function(){drag=false});
+
+  function pinta(){
+    var g=cv.g;clr(cv);
+    var m=mapper(cv,M,[LO,HI],[LO,HI]);
+    var tk=[152,158,164,170,176,182,188];
+    axes(cv,M,[LO,HI],[LO,HI],'altura média dos pais (cm)','altura do filho (cm)',tk,tk);
+    /* média */
+    g.globalAlpha=.5;dash(g,1);
+    seg(g,m.X(MU),M.t,m.X(MU),cv.h-M.b,CL.tx3,1);
+    seg(g,M.l,m.Y(MU),cv.w-M.r,m.Y(MU),CL.tx3,1);
+    dash(g,0);g.globalAlpha=1;
+    /* famílias */
+    var k=Math.sqrt(1-rr*rr);
+    g.globalAlpha=.5;
+    for(var i=0;i<F.length;i++){
+      var p=MU+SD*F[i].zp, c=MU+SD*(rr*F[i].zp+k*F[i].ze);
+      dot(g,m.X(p),m.Y(c),2.6,CL.warn);
+    }
+    g.globalAlpha=1;
+    /* identidade */
+    dash(g,1);seg(g,m.X(LO),m.Y(LO),m.X(HI),m.Y(HI),CL.tx2,1.6);dash(g,0);
+    /* reta */
+    function pr(p){return MU+rr*(p-MU)}
+    seg(g,m.X(LO),m.Y(pr(LO)),m.X(HI),m.Y(pr(HI)),CL.line,2.6);
+    /* seleção */
+    var yh=pr(sel);
+    seg(g,m.X(sel),cv.h-M.b,m.X(sel),m.Y(yh),CL.res,1.4);
+    seg(g,m.X(sel),m.Y(sel),m.X(sel),m.Y(yh),CL.red,2.6);
+    dot(g,m.X(sel),m.Y(sel),4,CL.tx3);
+    dot(g,m.X(sel),m.Y(yh),5.5,CL.res,'#fff');
+    T(g,'— ajuste',M.l+9,M.t+15,CL.line,10.5);
+    T(g,'-- identidade',M.l+9,M.t+30,CL.tx2,10.5);
+    var dp=sel-MU,dc=yh-MU;
+    out.innerHTML='inclinação = <b>'+fmt(rr,2)+'</b> · pais <b>'+(dp>=0?'+':'−')+fmt(Math.abs(dp),1)+
+      ' cm</b> da média → filho previsto <b>'+(dc>=0?'+':'−')+fmt(Math.abs(dc),1)+
+      ' cm</b> · puxado de volta <b>'+fmt(Math.abs(dp-dc),1)+' cm</b>';
+  }
+  cv.draw=pinta; setr(0.46);
+})();
+
+/* ========== DEMO 02 — arraste os pontos ========== */
+(function(){
+  var cv=C('c2',340); if(!cv)return;
+  var M={l:46,r:16,t:16,b:38},XR=[0,10],YR=[0,22];
+  var P=[],arrasta=null,quad=false;
+  var out=document.getElementById('o2');
+  function reset(){var R=RNG(5);P=[];for(var i=0;i<11;i++){var x=0.5+i*0.9;
+    P.push({x:x,y:3+1.5*x+R.g()*2.1})}pinta()}
+  document.getElementById('b2a').addEventListener('click',reset);
+  document.getElementById('b2b').addEventListener('change',function(e){quad=e.target.checked;pinta()});
+
+  function m(){return mapper(cv,M,XR,YR)}
+  cv.el.addEventListener('pointerdown',function(e){
+    var p=pos(cv,e),mm=m(),best=null,bd=1e9;
+    for(var i=0;i<P.length;i++){var d=Math.pow(mm.X(P[i].x)-p.x,2)+Math.pow(mm.Y(P[i].y)-p.y,2);
+      if(d<bd){bd=d;best=i}}
+    arrasta=(bd<1600)?best:null;
+  });
+  cv.el.addEventListener('pointermove',function(e){
+    if(arrasta===null)return;var p=pos(cv,e),mm=m();
+    P[arrasta].x=Math.max(XR[0]+.2,Math.min(XR[1]-.2,mm.iX(p.x)));
+    P[arrasta].y=Math.max(YR[0]+.4,Math.min(YR[1]-.4,mm.iY(p.y)));
+    pinta();
+  });
+  window.addEventListener('pointerup',function(){arrasta=null});
+
+  function pinta(){
+    var g=cv.g;clr(cv);
+    axes(cv,M,XR,YR,'x','y',[0,2,4,6,8,10],[0,5,10,15,20]);
+    var mm=m(),F=ols(P),i;
+    /* quadrados literais: lado = |resíduo| em pixels */
+    if(quad){
+      g.globalAlpha=.16;g.fillStyle=CL.res;
+      for(i=0;i<P.length;i++){
+        var yf=F.a+F.b*P[i].x, py=mm.Y(P[i].y), pf=mm.Y(yf), L=Math.abs(py-pf);
+        g.fillRect(mm.X(P[i].x), Math.min(py,pf), L, L);
+      }
+      g.globalAlpha=1;
+    }
+    /* resíduos */
+    for(i=0;i<P.length;i++){var yf2=F.a+F.b*P[i].x;
+      seg(g,mm.X(P[i].x),mm.Y(P[i].y),mm.X(P[i].x),mm.Y(yf2),CL.tx3,1)}
+    /* reta */
+    seg(g,mm.X(XR[0]),mm.Y(F.a+F.b*XR[0]),mm.X(XR[1]),mm.Y(F.a+F.b*XR[1]),CL.line,2.6);
+    /* centro de massa: a reta pivota por aqui */
+    dash(g,1);g.globalAlpha=.55;
+    seg(g,mm.X(F.mx),M.t,mm.X(F.mx),cv.h-M.b,CL.tx3,1);
+    seg(g,M.l,mm.Y(F.my),cv.w-M.r,mm.Y(F.my),CL.tx3,1);
+    g.globalAlpha=1;dash(g,0);
+    for(i=0;i<P.length;i++)dot(g,mm.X(P[i].x),mm.Y(P[i].y),5,CL.warn,'#fff');
+    dot(g,mm.X(F.mx),mm.Y(F.my),4.5,CL.grad,'#fff');
+    T(g,'(x̄, ȳ)',mm.X(F.mx)+8,mm.Y(F.my)-8,CL.grad,10);
+    out.innerHTML='ŷ = <b>'+fmt(F.a,2)+'</b> '+(F.b>=0?'+':'−')+' <b>'+fmt(Math.abs(F.b),3)+
+      '</b>·x &nbsp;·&nbsp; SSE = <b>'+fmt(F.sse,1)+'</b> &nbsp;·&nbsp; R² = <b>'+fmt(F.r2,3)+'</b>';
+  }
+  cv.draw=pinta; reset();
+})();
+
+/* ========== DEMO 03 — quatro diagnósticos ========== */
+(function(){
+  var cv=C('c3',430); if(!cv)return;
+  var out=document.getElementById('o3'),bar=document.getElementById('b3btns');
+  var CASOS=[
+    {n:'saudável', d:'Nuvem sem estrutura em torno de zero — nada a corrigir. É o único dos quatro em que a reta pode ser usada como está.',
+     f:function(x,R,i){return 3+1.7*x+R.g()*2.0}},
+    {n:'curvatura', d:'Um U limpo: a relação verdadeira curva e a reta não a acompanha. Acrescente um termo quadrático, ou transforme x.',
+     f:function(x,R,i){return 3+0.30*(x-5)*(x-5)+0.4*x+R.g()*1.1}},
+    {n:'funil', d:'A dispersão cresce com ŷ — heteroscedasticidade. A reta está aproximadamente certa, mas todo intervalo de confiança construído sobre ela está errado.',
+     f:function(x,R,i){return 3+1.7*x+R.g()*(0.25+0.62*x)}},
+    {n:'um outlier', d:'Um único ponto de alta alavancagem arrasta a reta para longe dos outros 39 — e o resíduo dele nem é o maior. É exatamente isso que a alavancagem faz.',
+     f:function(x,R,i){return i===39?(3+1.7*10-26):(3+1.7*x+R.g()*1.6)}}
+  ];
+  var cur=0,btns=[];
+  CASOS.forEach(function(c,i){
+    var b=document.createElement('button');b.className='btn';b.textContent=c.n;
+    b.setAttribute('aria-pressed',i===0?'true':'false');
+    b.addEventListener('click',function(){cur=i;
+      btns.forEach(function(x,j){x.setAttribute('aria-pressed',j===i?'true':'false')});pinta()});
+    bar.appendChild(b);btns.push(b);
+  });
+
+  function build(){
+    var R=RNG(7),c=CASOS[cur],P=[],i;
+    for(i=0;i<40;i++){var x=(i%20)*0.5+0.25+(i>=20?0.25:0);P.push({x:x,y:c.f(x,R,i)})}
+    var F=ols(P);
+    for(i=0;i<P.length;i++){P[i].f=F.a+F.b*P[i].x;P[i].e=P[i].y-P[i].f}
+    return {P:P,F:F};
+  }
+  function pinta(){
+    var g=cv.g;clr(cv);
+    var B=build(),P=B.P,F=B.F,i;
+    var xs=P.map(function(p){return p.x}),ys=P.map(function(p){return p.y}),
+        fs=P.map(function(p){return p.f}),es=P.map(function(p){return p.e});
+    var xr=[Math.min.apply(null,xs)-.4,Math.max.apply(null,xs)+.4],
+        yr=[Math.min.apply(null,ys)-1.5,Math.max.apply(null,ys)+1.5],
+        fr=[Math.min.apply(null,fs)-.6,Math.max.apply(null,fs)+.6];
+    var em=Math.max.apply(null,es.map(Math.abs))*1.18||1;
+    var H=cv.h, top={l:46,r:16,t:14,b:H-215}, bot={l:46,r:16,t:H-190,b:34};
+    /* --- painel 1 --- */
+    var o1={w:cv.w,h:H,g:g};
+    axes(o1,top,xr,yr,'','y',null,null);
+    var m1=mapper(o1,top,xr,yr);
+    seg(g,m1.X(xr[0]),m1.Y(F.a+F.b*xr[0]),m1.X(xr[1]),m1.Y(F.a+F.b*xr[1]),CL.line,2.4);
+    for(i=0;i<P.length;i++)seg(g,m1.X(P[i].x),m1.Y(P[i].y),m1.X(P[i].x),m1.Y(P[i].f),CL.tx3,1);
+    for(i=0;i<P.length;i++)dot(g,m1.X(P[i].x),m1.Y(P[i].y),3.4,CL.warn);
+    T(g,'dados + reta',top.l+7,top.t+14,CL.tx3,10.5);
+    T(g,'R² = '+fmt(F.r2,3),cv.w-top.r-12,top.t+14,CL.tx2,10.5,'right');
+    /* --- painel 2 --- */
+    axes(o1,bot,fr,[-em,em],'previsto ŷ','resíduo',null,null);
+    var m2=mapper(o1,bot,fr,[-em,em]);
+    seg(g,bot.l,m2.Y(0),cv.w-bot.r,m2.Y(0),CL.line,1.5);
+    for(i=0;i<P.length;i++)dot(g,m2.X(P[i].f),m2.Y(P[i].e),3.4,CL.warn);
+    T(g,'resíduo vs previsto',bot.l+7,bot.t+14,CL.tx3,10.5);
+    out.innerHTML='<b>'+CASOS[cur].n+'</b> · R² = <b>'+fmt(F.r2,3)+'</b> — '+CASOS[cur].d;
+  }
+  cv.draw=pinta; pinta();
+})();
+
+/* ========== DEMO 04 — a superfície de erro ========== */
+(function(){
+  var cv=C('c4',380); if(!cv)return;
+  var out=document.getElementById('o4');
+  var R=RNG(11),bruto=[],i;
+  for(i=0;i<30;i++){var x=i/29*10;bruto.push({x:x,y:2+1.5*x+R.g()*2.2})}
+  var xbar=0;for(i=0;i<bruto.length;i++)xbar+=bruto[i].x;xbar/=bruto.length;
+
+  var centrado=false,D,OPT,W0,W1,surf=null,cam=[],timer=null;
+  var sl=document.getElementById('r4'),ov=document.getElementById('r4v');
+  sl.addEventListener('input',function(){ov.textContent=fmt(parseFloat(sl.value),3);para()});
+  document.getElementById('b4a').addEventListener('click',passo);
+  document.getElementById('b4b').addEventListener('click',roda);
+  document.getElementById('b4c').addEventListener('click',function(){para();prep();pinta()});
+  var bC=document.getElementById('b4d');
+  bC.addEventListener('click',function(){centrado=!centrado;
+    bC.setAttribute('aria-pressed',centrado?'true':'false');para();prep();pinta()});
+
+  function prep(){
+    D=bruto.map(function(p){return {x:centrado?p.x-xbar:p.x,y:p.y}});
+    var F=ols(D); OPT={w0:F.a,w1:F.b};
+    W0=[OPT.w0-9,OPT.w0+9]; W1=[OPT.w1-2.2,OPT.w1+2.2]; surf=null;
+    cam=[{w0:OPT.w0+5,w1:OPT.w1-1.5}];
+  }
+  function J(w0,w1){var s=0;for(var i=0;i<D.length;i++){var e=D[i].y-w0-w1*D[i].x;s+=e*e}return s/D.length}
+  function grad(w0,w1){var g0=0,g1=0;for(var i=0;i<D.length;i++){var e=D[i].y-w0-w1*D[i].x;g0+=-2*e;g1+=-2*e*D[i].x}
+    return [g0/D.length,g1/D.length]}
+  function passo(){
+    var w=cam[cam.length-1],G=grad(w.w0,w.w1),eta=parseFloat(sl.value);
+    var n0=w.w0-eta*G[0],n1=w.w1-eta*G[1];
+    if(!isFinite(n0)||Math.abs(n0)>1e4||cam.length>400){para();return}
+    cam.push({w0:n0,w1:n1});pinta();
+  }
+  function roda(){para();timer=setInterval(passo,90)}
+  function para(){if(timer){clearInterval(timer);timer=null}}
+
+  var PL={l:44,r:0,t:28,b:66},PR={l:0,r:14,t:28,b:66};
+  function geo(){var half=(cv.w-70)/2;
+    return {ax:44,aw:half-10,bx:44+half+26,bw:half-16,ay:28,ah:cv.h-28-52}}
+
+  var VIR=[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+  function ramp(t){t=Math.max(0,Math.min(.999,t));var x=t*(VIR.length-1),i=Math.floor(x),f=x-i,
+    a=VIR[i],b=VIR[i+1];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f]}
+  function faz(){
+    var GW=140,GH=140,off=document.createElement('canvas');off.width=GW;off.height=GH;
+    var oc=off.getContext('2d'),img=oc.createImageData(GW,GH),V=new Float64Array(GW*GH),lo=1e30,hi=-1e30,i,j;
+    for(j=0;j<GH;j++){var w1=W1[1]-(j+.5)/GH*(W1[1]-W1[0]);
+      for(i=0;i<GW;i++){var w0=W0[0]+(i+.5)/GW*(W0[1]-W0[0]);
+        var v=Math.log10(J(w0,w1)+1e-6);V[j*GW+i]=v;if(v<lo)lo=v;if(v>hi)hi=v}}
+    var BN=11;
+    for(var k=0;k<GW*GH;k++){var t=(V[k]-lo)/(hi-lo||1);t=Math.floor(t*BN)/(BN-1);
+      var c=ramp(Math.min(1,t));img.data[k*4]=c[0];img.data[k*4+1]=c[1];img.data[k*4+2]=c[2];img.data[k*4+3]=245}
+    oc.putImageData(img,0,0);return off;
+  }
+  cv.el.addEventListener('pointerdown',function(e){
+    var p=pos(cv,e),g=geo();
+    if(p.x<g.ax||p.x>g.ax+g.aw||p.y<g.ay||p.y>g.ay+g.ah)return;
+    para();
+    cam=[{w0:W0[0]+(p.x-g.ax)/g.aw*(W0[1]-W0[0]), w1:W1[1]-(p.y-g.ay)/g.ah*(W1[1]-W1[0])}];
+    pinta();
+  });
+
+  function pinta(){
+    if(!surf)surf=faz();
+    var g=cv.g;clr(cv);var G=geo(),i;
+    /* --- esquerda: espaço de parâmetros --- */
+    g.save();g.beginPath();g.rect(G.ax,G.ay,G.aw,G.ah);g.clip();
+    g.drawImage(surf,G.ax,G.ay,G.aw,G.ah);g.restore();
+    g.strokeStyle=CL.tx3;g.lineWidth=1;g.strokeRect(G.ax,G.ay,G.aw,G.ah);
+    function AX(w){return G.ax+(w-W0[0])/(W0[1]-W0[0])*G.aw}
+    function AY(w){return G.ay+(W1[1]-w)/(W1[1]-W1[0])*G.ah}
+    if(cam.length>1){g.strokeStyle='#fff';g.lineWidth=1.8;g.globalAlpha=.92;g.beginPath();
+      for(i=0;i<cam.length;i++){var X=Math.max(G.ax,Math.min(G.ax+G.aw,AX(cam[i].w0))),
+        Y=Math.max(G.ay,Math.min(G.ay+G.ah,AY(cam[i].w1)));i?g.lineTo(X,Y):g.moveTo(X,Y)}
+      g.stroke();g.globalAlpha=1}
+    var w=cam[cam.length-1];
+    dot(g,Math.max(G.ax,Math.min(G.ax+G.aw,AX(w.w0))),Math.max(G.ay,Math.min(G.ay+G.ah,AY(w.w1))),5,CL.red,'#fff');
+    g.strokeStyle='#fff';g.lineWidth=2;g.beginPath();
+    g.moveTo(AX(OPT.w0)-7,AY(OPT.w1));g.lineTo(AX(OPT.w0)+7,AY(OPT.w1));
+    g.moveTo(AX(OPT.w0),AY(OPT.w1)-7);g.lineTo(AX(OPT.w0),AY(OPT.w1)+7);g.stroke();
+    T(g,'J(w₀,w₁) — escuro = baixo',G.ax,G.ay-8,CL.tx2,10.5);
+    T(g,'w₀',G.ax+G.aw/2,G.ay+G.ah+16,CL.tx2,10.5,'center');
+    g.save();g.translate(13,G.ay+G.ah/2);g.rotate(-Math.PI/2);T(g,'w₁',0,0,CL.tx2,10.5,'center');g.restore();
+    /* --- direita: espaço de dados --- */
+    var xs=D.map(function(p){return p.x}),ys=D.map(function(p){return p.y});
+    var xr=[Math.min.apply(null,xs)-.6,Math.max.apply(null,xs)+.6],
+        yr=[Math.min.apply(null,ys)-2,Math.max.apply(null,ys)+2];
+    function DX(x){return G.bx+(x-xr[0])/(xr[1]-xr[0])*G.bw}
+    function DY(y){return G.ay+G.ah-(y-yr[0])/(yr[1]-yr[0])*G.ah}
+    g.strokeStyle=CL.tx3;g.strokeRect(G.bx,G.ay,G.bw,G.ah);
+    g.save();g.beginPath();g.rect(G.bx,G.ay,G.bw,G.ah);g.clip();
+    dash(g,1);seg(g,DX(xr[0]),DY(OPT.w0+OPT.w1*xr[0]),DX(xr[1]),DY(OPT.w0+OPT.w1*xr[1]),CL.res,1.6);dash(g,0);
+    seg(g,DX(xr[0]),DY(w.w0+w.w1*xr[0]),DX(xr[1]),DY(w.w0+w.w1*xr[1]),CL.red,2.4);
+    for(i=0;i<D.length;i++)dot(g,DX(D[i].x),DY(D[i].y),3.2,CL.warn);
+    g.restore();
+    T(g,'reta atual (vermelha) vs ótimo (verde)',G.bx,G.ay-8,CL.tx2,10.5);
+    T(g,'x',G.bx+G.bw/2,G.ay+G.ah+16,CL.tx2,10.5,'center');
+
+    var j=J(w.w0,w.w1),ruim=!isFinite(j)||j>1e6;
+    out.innerHTML='iteração <b>'+(cam.length-1)+'</b> · w₀ = <b>'+fmt(w.w0,2)+'</b> · w₁ = <b>'+
+      fmt(w.w1,2)+'</b> · J = <b>'+(ruim?'∞':fmt(j,2))+'</b> (ótimo '+fmt(J(OPT.w0,OPT.w1),2)+')'+
+      (ruim?' · <b style="color:var(--danger)">DIVERGIU — reduza η</b>':'')+'<br>'+
+      (centrado
+        ? 'Centrado: as faixas são quase circulares, −∇J aponta quase direto para a cruz e poucos passos resolvem.'
+        : 'Sem centrar: as faixas formam um vale longo e estreito. O gradiente aponta atravessado e o caminho ziguezagueia.');
+  }
+  cv.draw=pinta; prep(); pinta();
+})();
+
+</script>
+</body>
+</html>
