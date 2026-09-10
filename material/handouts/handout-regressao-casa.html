@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Regressão linear em casa — a conta inteira, executável</title>
+<style>
+:root{
+  /* ---- superfícies ---- */
+  --paper:#EBEEE8; --paper-2:#F7F8F4; --card:#FFFFFF; --code:#F2F5F0;
+  /* ---- tinta ---- */
+  --ink:#13242B; --ink-soft:#4C5F66; --ink-faint:#849498;
+  /* ---- acentos: um por ideia ---- */
+  --hydro:#1F6B8E;      /* a reta / mínimos quadrados */
+  --revision:#7A2E86;   /* o gradiente */
+  --veg:#5A7A3F;        /* resíduos */
+  --contour:#A8763F; --danger:#9E3B2E;
+  /* ---- linhas ---- */
+  --rule:rgba(19,36,43,.14); --rule-strong:rgba(19,36,43,.30);
+  --canvas-grid:#DDE4DC;
+  /* ---- tipografia ---- */
+  --display:'Archivo',system-ui,-apple-system,sans-serif;
+  --body:'Source Serif 4',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --rail:250px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.66;letter-spacing:.002em;-webkit-font-smoothing:antialiased}
+img,canvas{max-width:100%}
+a{color:var(--hydro);text-underline-offset:3px;text-decoration-thickness:1px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:2.5px solid var(--revision);outline-offset:3px}
+
+/* ---------- RAIL ---------- */
+.rail{position:fixed;inset:0 auto 0 0;width:var(--rail);background:var(--paper-2);border-right:1px solid var(--rule-strong);padding:22px 0 40px;overflow-y:auto;z-index:40}
+.rail__brand{padding:0 18px 14px;border-bottom:1px solid var(--rule)}
+.rail__mark{font-family:var(--mono);font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--contour);display:block;margin-bottom:6px}
+.rail__title{font-family:var(--display);font-weight:700;font-size:15px;line-height:1.22;letter-spacing:-.008em;margin:0}
+.rail__sub{font-family:var(--mono);font-size:10px;color:var(--ink-faint);margin-top:6px;letter-spacing:.04em}
+.rail nav{padding:12px 0 0}
+.rail h4{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);margin:16px 18px 6px;font-weight:600}
+.rail a{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:baseline;padding:6px 18px;font-family:var(--display);font-weight:500;font-size:12.8px;line-height:1.34;color:var(--ink-soft);text-decoration:none;border-left:2.5px solid transparent}
+.rail a b{font-family:var(--mono);font-weight:500;font-size:10.5px;color:var(--contour)}
+.rail a:hover{color:var(--ink);background:rgba(31,107,142,.06)}
+.rail a.on{color:var(--revision);border-left-color:var(--revision);background:rgba(122,46,134,.06)}
+.rail a.on b{color:var(--revision)}
+.rail__foot{padding:18px 18px 0;margin-top:18px;border-top:1px solid var(--rule);font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.6}
+.railtoggle{display:none}
+
+/* ---------- LAYOUT ---------- */
+.wrap{margin-left:var(--rail)}
+.col{max-width:820px;margin:0 auto;padding:0 34px}
+.col--wide{max-width:1080px}
+
+/* ---------- HERO ---------- */
+.hero{border-bottom:1px solid var(--rule-strong);background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 60%),var(--paper);padding:54px 0 0}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--contour);margin:0 0 18px}
+h1{font-family:var(--display);font-weight:700;letter-spacing:-.022em;line-height:1.02;font-size:clamp(34px,5.4vw,58px);margin:0 0 18px}
+h1 em{font-style:normal;color:var(--revision)}
+.deck{font-size:19px;line-height:1.55;color:var(--ink-soft);max-width:58ch;margin:0 0 26px}
+.deck b{color:var(--ink);font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--rule-strong);margin-top:8px}
+.meta div{flex:1 1 0;min-width:120px;padding:14px 16px 16px;border-right:1px solid var(--rule)}
+.meta div:last-child{border-right:0}
+.meta span{display:block;font-family:var(--display);font-weight:700;font-size:20px;line-height:1.1;color:var(--ink)}
+.meta small{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin-top:5px}
+
+/* ---------- SECTIONS ---------- */
+section{padding:64px 0 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.aulahead{margin-bottom:30px}
+.aulahead .n{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--revision);display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.aulahead .n::after{content:"";flex:1;height:1px;background:var(--rule-strong)}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(25px,3.2vw,34px);letter-spacing:-.018em;line-height:1.14;margin:0 0 12px}
+h3{font-family:var(--display);font-weight:700;font-size:19.5px;letter-spacing:-.008em;margin:42px 0 10px;scroll-margin-top:20px}
+h3 span{font-family:var(--mono);font-weight:500;font-size:13px;color:var(--contour);margin-right:9px}
+h4{font-family:var(--display);font-weight:600;font-size:15.5px;margin:26px 0 8px;letter-spacing:-.003em}
+p{margin:0 0 15px}
+ul,ol{margin:0 0 16px;padding-left:22px}
+li{margin-bottom:7px}
+li::marker{color:var(--contour)}
+strong{font-weight:600}
+.lede{font-size:18px;line-height:1.55;color:var(--ink-soft);max-width:60ch}
+.goals{background:var(--paper-2);border:1px solid var(--rule);padding:18px 22px 14px;margin:0 0 8px}
+.goals h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px;font-weight:600}
+.goals ul{margin:0;padding-left:18px;font-size:16px}
+
+/* ---------- MATH ---------- */
+.eq{margin:20px 0;padding:14px 18px;background:var(--paper-2);border:1px solid var(--rule);border-left:3px solid var(--hydro);font-family:var(--mono);font-size:14.5px;line-height:1.9;overflow-x:auto}
+.eq b{color:var(--hydro);font-weight:600}
+.eq i{font-style:italic;color:var(--ink-soft)}
+.eq .lbl{float:right;font-size:11px;color:var(--ink-faint);letter-spacing:.08em}
+
+/* ---------- CODE ---------- */
+pre{background:var(--code);color:#1B2F36;font-family:var(--mono);font-size:13px;line-height:1.72;padding:16px 18px;overflow-x:auto;margin:0 0 16px;border:1px solid var(--rule);border-left:3px solid var(--hydro)}
+pre b{color:#0F5B7E;font-weight:600}
+pre i{color:#3E6B2F;font-style:normal}
+pre u{color:#7C8C91;text-decoration:none}
+pre em{color:#9A5A17;font-style:normal}
+code{font-family:var(--mono);font-size:.88em;background:rgba(31,107,142,.10);padding:1px 5px;border-radius:2px}
+.filelabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:22px 0 6px}
+
+/* ---------- FIGURES / DEMOS ---------- */
+figure.fig{margin:24px 0 28px;border:1px solid var(--rule-strong);background:var(--card);padding:14px 14px 11px}
+figure.fig canvas{display:block;width:100%;height:auto;background:#FBFCF9;border:1px solid var(--rule)}
+figure.fig figcaption{font-family:var(--body);font-size:14.5px;line-height:1.55;color:var(--ink-soft);margin-top:11px;border-top:1px solid var(--rule);padding-top:10px}
+figure.fig figcaption b{color:var(--ink);font-weight:600}
+.demohead{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--revision);margin:0 0 9px;font-weight:600}
+.demohead span{color:var(--ink-faint);float:right;letter-spacing:.08em}
+.ctrls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:11px 0 0;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft)}
+.ctrls label{display:flex;align-items:center;gap:7px}
+.ctrls input[type=range]{accent-color:var(--hydro);width:130px}
+.ctrls output{color:var(--hydro);font-weight:600;min-width:3.4em;display:inline-block}
+.btn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;padding:6px 12px;border:1px solid var(--rule-strong);background:transparent;cursor:pointer;color:var(--ink-soft);transition:.15s}
+.btn:hover{border-color:var(--hydro);color:var(--ink)}
+.btn--on,.btn[aria-pressed="true"]{background:rgba(31,107,142,.13);color:var(--ink);border-color:var(--hydro);box-shadow:inset 2px 0 0 var(--hydro)}
+.btn--go{background:var(--revision);color:#fff;border-color:var(--revision)}
+.btn--go:hover{background:#8f39a0;color:#fff}
+.readout{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);line-height:1.75;margin-top:10px;min-height:1.2em}
+.readout b{color:var(--ink)}
+
+/* ---------- CALLOUTS ---------- */
+.box{border:1px solid var(--rule-strong);border-left-width:3px;padding:15px 19px 12px;margin:20px 0;background:var(--card);font-size:16px}
+.box h5{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;margin:0 0 8px;font-weight:600}
+.box p:last-child,.box ul:last-child{margin-bottom:0}
+.box--obs{border-left-color:var(--veg)} .box--obs h5{color:var(--veg)}
+.box--trap{border-left-color:var(--revision)} .box--trap h5{color:var(--revision)}
+.box--note{border-left-color:var(--hydro)} .box--note h5{color:var(--hydro)}
+.box--warn{border-left-color:var(--danger)} .box--warn h5{color:var(--danger)}
+
+/* ---------- TABLES ---------- */
+.tw{overflow-x:auto;margin:18px 0 22px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-family:var(--mono)}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--rule);white-space:nowrap}
+thead th{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);border-bottom:1px solid var(--rule-strong);font-weight:600}
+tbody tr:hover{background:rgba(31,107,142,.05)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.txt{font-family:var(--body);font-size:15px;line-height:1.55}
+table.txt td{white-space:normal;vertical-align:top}
+caption{caption-side:bottom;text-align:left;font-family:var(--mono);font-size:11px;color:var(--ink-faint);padding-top:9px;line-height:1.6}
+
+/* ---------- EXERCISES ---------- */
+.exwrap{margin:34px 0 10px;border-top:2px solid var(--ink);padding-top:20px}
+.exwrap > h4{margin-top:0;font-size:13px;font-family:var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink)}
+.ex{border-left:2.5px solid var(--revision);padding:2px 0 2px 18px;margin:0 0 24px}
+.ex__t{font-family:var(--display);font-weight:600;font-size:15.5px;letter-spacing:-.003em;margin:0 0 7px}
+.ex__t b{font-family:var(--mono);font-weight:500;font-size:12.5px;color:var(--revision);margin-right:8px}
+.ex p{font-size:16px}
+.tag{display:inline-block;font-family:var(--mono);font-size:9px;letter-spacing:.13em;text-transform:uppercase;border:1px solid var(--rule-strong);padding:2px 7px;margin-left:8px;color:var(--ink-faint);vertical-align:2px}
+details{margin-top:10px;border-top:1px dashed var(--rule-strong);padding-top:9px}
+summary{cursor:pointer;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hydro);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸ ";font-size:11px}
+details[open] summary::before{content:"▾ "}
+details > div{padding-top:10px;font-size:16px}
+details pre{font-size:12.2px}
+
+.top{display:block;text-align:right;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);text-decoration:none;margin:38px 0 0;padding-bottom:6px}
+.top:hover{color:var(--revision)}
+footer{margin-top:60px;border-top:1px solid var(--rule-strong);background:var(--paper-2);padding:36px 0 60px}
+footer .col{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);line-height:1.85}
+
+@media (max-width:1080px){
+  :root{--rail:0px}
+  .rail{position:static;width:auto;border-right:0;border-bottom:1px solid var(--rule-strong)}
+  .rail nav{display:none;max-width:820px;margin:0 auto;padding:8px 20px 16px}
+  .rail nav.open{display:block}
+  .rail__brand{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:2px 34px 14px}
+  .railtoggle{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;border:1px solid var(--rule-strong);background:transparent;padding:8px 12px;cursor:pointer;color:var(--ink)}
+  .rail a{padding:5px 0}
+  .rail__foot{display:none}
+  .col{padding:0 22px}
+}
+@media (max-width:560px){body{font-size:16px}.col{padding:0 16px}.meta div{flex:1 1 50%;border-bottom:1px solid var(--rule)}}
+@media print{
+  .rail,.top,.ctrls,.railtoggle{display:none}
+  .wrap{margin-left:0}
+  body{background:#fff;font-size:11pt}
+  section{padding:22px 0 0;page-break-inside:auto}
+  figure.fig,.box,.ex{page-break-inside:avoid}
+  h2,h3{page-break-after:avoid}
+  details{display:block}
+  details > div{display:block!important}
+  a{color:var(--ink);text-decoration:none}
+}
+
+/* ---------- CÉLULAS EXECUTÁVEIS ---------- */
+.cell{margin:22px 0 26px;border:1px solid var(--rule-strong);background:var(--card)}
+.cell .cod{margin:0;border:0;border-left:3px solid var(--revision);border-radius:0;
+  background:var(--code);font-family:var(--mono);font-size:12.8px;line-height:1.62;
+  padding:15px 17px;overflow-x:auto;white-space:pre;color:var(--ink)}
+.cellbar{display:flex;align-items:center;gap:12px;padding:8px 14px;border-top:1px solid var(--rule);
+  background:var(--paper-2)}
+.cellnum{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+.btn-run{font-family:var(--mono);font-size:11px;letter-spacing:.06em;padding:5px 14px;
+  border:1px solid var(--revision);background:var(--revision);color:#fff;cursor:pointer}
+.btn-run:hover{background:#8f39a0}
+.btn-run:disabled{opacity:.5;cursor:default}
+.saida{margin:0;padding:13px 17px;border-top:1px dashed var(--rule-strong);background:#FBFCF9;
+  font-family:var(--mono);font-size:12.4px;line-height:1.6;white-space:pre-wrap;color:var(--ink);
+  overflow-x:auto}
+.saida--erro{background:#FDF2F0;color:var(--danger)}
+.runtime{position:sticky;top:0;z-index:30;margin-left:var(--rail);background:var(--paper-2);border-bottom:1px solid var(--rule-strong);
+  padding:9px 0;font-family:var(--mono);font-size:11px}
+.runtime .col{display:flex;align-items:center;gap:16px}
+#rodar-tudo{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:5px 12px;
+  border:1px solid var(--rule-strong);background:transparent;cursor:pointer;color:var(--ink-soft)}
+#rodar-tudo:hover{border-color:var(--hydro);color:var(--ink)}
+
+/* ---------- QUIZ ---------- */
+.quiz{counter-reset:qn}
+.q{border:1px solid var(--rule-strong);border-left:3px solid var(--hydro);background:var(--card);
+  padding:16px 20px 12px;margin:18px 0}
+.q__t{font-family:var(--display);font-weight:600;font-size:16px;margin:0 0 12px}
+.q__t::before{counter-increment:qn;content:counter(qn) ". ";color:var(--hydro);font-family:var(--mono);font-size:13px}
+.opt{border:1px solid var(--rule);padding:9px 13px;margin:6px 0;cursor:pointer;font-size:15.5px;
+  transition:.12s;background:var(--paper-2)}
+.opt:hover{border-color:var(--hydro)}
+.respondida .opt{cursor:default}
+.opt--certa{border-color:var(--veg);background:rgba(90,122,63,.14);font-weight:600}
+.opt--errada{border-color:var(--danger);background:rgba(158,59,46,.10)}
+.fb{margin-top:12px;padding:12px 15px;background:var(--paper-2);border-left:3px solid var(--veg);font-size:15px}
+#placar{font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-top:14px}
+@media print{
+  .cellbar,#rodar-tudo,.runtime{display:none}
+  .saida{display:block!important}
+  .opt--certa{border-color:#000}
+}
+
+</style>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js" defer></script>
+</head>
+<body>
+<script>
+window.__ir=function(a){var id=(a.getAttribute('href')||'').replace(/^.*#/,'');
+if(!id){window.scrollTo({top:0,behavior:'smooth'});return false}
+var el=document.getElementById(id);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});return false}return true;};
+window.addEventListener('DOMContentLoaded',function(){
+  var links=[].slice.call(document.querySelectorAll('.rail a[href^="#"]'));
+  var secs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1))});
+  function upd(){var best=0,bd=1e9;for(var i=0;i<secs.length;i++){if(!secs[i])continue;
+    var d=Math.abs(secs[i].getBoundingClientRect().top-100);if(d<bd){bd=d;best=i}}
+    links.forEach(function(a,i){a.classList.toggle('on',i===best)})}
+  window.addEventListener('scroll',upd,{passive:true});upd();
+  var tg=document.getElementById('railtoggle');
+  if(tg)tg.addEventListener('click',function(){document.querySelector('.rail nav').classList.toggle('open')});
+});
+</script>
+
+<aside id="rail" class="rail">
+  <div class="rail__brand">
+    <div>
+      <span class="rail__mark">Insper · Machine Learning</span>
+      <p class="rail__title">Regressão linear<br>em casa</p>
+      <p class="rail__sub">Python roda na página</p>
+    </div>
+    <button id="railtoggle" class="railtoggle">índice</button>
+  </div>
+  <nav>
+    <h4>Roteiro</h4>
+    <a href="#s0"><b>—</b><span>Como usar</span></a>
+    <a href="#s1"><b>01</b><span>As ferramentas</span></a>
+    <a href="#s2"><b>02</b><span>Os dados e a matriz de projeto</span></a>
+    <a href="#s3"><b>03</b><span>As equações normais</span></a>
+    <a href="#s4"><b>04</b><span>O que define a solução</span></a>
+    <a href="#s5"><b>05</b><span>Gradiente descendente</span></a>
+    <a href="#s6"><b>06</b><span>O passo grande demais</span></a>
+    <a href="#s7"><b>07</b><span>Ridge, do zero</span></a>
+    <a href="#s8"><b>08</b><span>Onde o alfa salva a conta</span></a>
+    <h4>Fixação</h4>
+    <a href="#quiz"><b>—</b><span>Oito perguntas</span></a>
+    <a href="#ref"><b>—</b><span>Referências</span></a>
+  </nav>
+  <div class="rail__foot">
+    Sem instalação.<br>Sem dependências.<br>Nada sai da sua máquina.
+  </div>
+</aside>
+
+<div class="runtime"><div class="col">
+  <span id="runtime-status">o Python carrega no primeiro “rodar”</span>
+  <button id="rodar-tudo">▶ rodar todas em ordem</button>
+</div></div>
+
+<div class="wrap">
+<header class="hero">
+  <div class="col col--wide">
+    <p class="eyebrow">Machine Learning · Regressão · Para fazer em casa</p>
+    <h1>A conta inteira,<br><em>uma linha de cada vez.</em></h1>
+    <p class="deck">Este roteiro não pede que você acredite em nada. Cada afirmação vem
+    seguida de uma célula de Python que você roda <b>aqui mesmo, nesta página</b> — sem
+    instalar nada, sem sair do navegador. Tudo em biblioteca padrão: nem
+    <code>numpy</code>. Num texto que constrói regressão do zero, esconder a álgebra
+    atrás de uma chamada de matriz seria contraditório.</p>
+    <div class="meta">
+      <div><span>9</span><small>células executáveis</small></div>
+      <div><span>8</span><small>perguntas</small></div>
+      <div><span>0</span><small>dependências</small></div>
+      <div><span>~90</span><small>minutos</small></div>
+    </div>
+  </div>
+</header>
+
+<main class="col">
+
+<section id="s0">
+  <div class="aulahead"><p class="n">Antes de começar</p><h2>Como usar</h2></div>
+  <p class="lede">Aperte <b>rodar</b> na primeira célula. O Python leva uns segundos para
+  carregar — só na primeira vez — e depois todas as células compartilham o mesmo estado,
+  como num notebook. Rode em ordem: cada uma usa o que a anterior definiu.</p>
+  <div class="box box--note">
+    <h5>Pré-requisito</h5>
+    <p>Ter percorrido o roteiro de aula. Aqui não se repete a motivação: assume-se que
+    você já sabe o que é resíduo e por que os mínimos quadrados elevam ao quadrado. O que
+    se faz é <b>construir</b> tudo, do transposto ao Ridge, sem biblioteca.</p>
+  </div>
+</section>
+
+<section id="s1">
+  <div class="aulahead"><p class="n">01</p><h2>As ferramentas</h2></div>
+  <p>Quatro funções bastam para o roteiro inteiro: transposta, produto matriz-matriz,
+  produto matriz-vetor, e um solucionador de sistema linear. Este último é eliminação de
+  Gauss com pivotamento parcial — trinta linhas que substituem o
+  <code>numpy.linalg.solve</code>.</p>
+  <p>Repare em uma decisão: o solucionador <b>detecta singularidade</b> e levanta erro em
+  vez de devolver lixo. Isso vai importar na última célula.</p>
+  <div class="cell"><pre class="cod"># Álgebra linear em Python puro: nada de numpy, para nada ficar escondido.
+
+def T(M):
+    &quot;transposta&quot;
+    return [list(col) for col in zip(*M)]
+
+def matmul(A, B):
+    Bt = T(B)
+    return [[sum(a*b for a, b in zip(lin, col)) for col in Bt] for lin in A]
+
+def matvec(A, v):
+    return [sum(a*b for a, b in zip(lin, v)) for lin in A]
+
+def resolve(A, b):
+    &quot;elimination de Gauss com pivotamento parcial; devolve x tal que Ax = b&quot;
+    n = len(A)
+    M = [linha[:] + [bi] for linha, bi in zip(A, b)]      # matriz aumentada
+    for c in range(n):
+        p = max(range(c, n), key=lambda r: abs(M[r][c]))  # pivô
+        if abs(M[p][c]) &lt; 1e-14:
+            raise ValueError(&quot;matriz singular: não há solução única&quot;)
+        M[c], M[p] = M[p], M[c]
+        for r in range(n):
+            if r == c:
+                continue
+            f = M[r][c] / M[c][c]
+            for k in range(c, n+1):
+                M[r][k] -= f * M[c][k]
+    return [M[i][n] / M[i][i] for i in range(n)]
+
+print(&quot;helpers prontos:&quot;, &quot;, &quot;.join([&quot;T&quot;, &quot;matmul&quot;, &quot;matvec&quot;, &quot;resolve&quot;]))</pre></div>
+</section>
+
+<section id="s2">
+  <div class="aulahead"><p class="n">02</p><h2>Os dados, e a matriz de projeto</h2></div>
+  <p>Cinco observações. A coluna de 1s não é enfeite de notação: é o que faz o intercepto
+  ser tratado como qualquer outro peso, permitindo escrever o modelo inteiro como
+  <i>ŷ</i> = <i>Xw</i>.</p>
+  <div class="cell"><pre class="cod"># Os dados. Pequenos de propósito: tudo confere no papel.
+xs = [1.0, 2.0, 3.0, 4.0, 5.0]
+ys = [2.0, 4.0, 5.0, 4.0, 6.0]
+
+X = [[1.0, x] for x in xs]        # coluna de 1s + coluna de x
+print(&quot;X =&quot;)
+for linha in X:
+    print(&quot;   &quot;, linha)
+print(&quot;y =&quot;, ys)
+print(&quot;forma de X:&quot;, len(X), &quot;x&quot;, len(X[0]))</pre></div>
+  <div class="box box--trap">
+    <h5>A armadilha · a tentação de inverter X</h5>
+    <p>Olhando <i>ŷ</i> = <i>Xw</i>, o reflexo é <i>w</i> = <i>X</i><sup>−1</sup><i>y</i>. Repare no formato que a
+    célula imprimiu: <b>5 × 2</b>. Não é quadrada, e inversa só existe para matriz
+    quadrada.</p>
+    <p>Mas o obstáculo real é outro: são cinco equações e duas incógnitas. Um <i>w</i> exato
+    só existiria se <i>y</i> estivesse no espaço gerado pelas colunas de <i>X</i> — e ele não
+    está. <b>Nenhum <i>w</i> resolve <i>Xw</i> = <i>y</i>.</b> Não é azar: é a situação normal, e é a
+    razão de a regressão existir.</p>
+  </div>
+</section>
+
+<section id="s3">
+  <div class="aulahead"><p class="n">03</p><h2>As equações normais</h2></div>
+  <p>Como <i>y</i> está fora de alcance, busca-se o ponto alcançável mais próximo: minimizar
+  ‖<i>y</i> − <i>Xw</i>‖². Igualando o gradiente a zero:</p>
+  <div class="eq">X<sup>T</sup>X w = X<sup>T</sup>y <span class="lbl">as equações normais</span></div>
+  <p>O truque está no formato. <i>X</i><sup>T</sup><i>X</i> é <i>d</i> × <i>d</i> — <b>quadrada</b> — e
+  invertível sempre que <i>X</i> tem posto-coluna cheio. Nunca se inverte <i>X</i>; inverte-se
+  <i>X</i><sup>T</sup><i>X</i>. E nem isso, na prática: resolve-se o sistema.</p>
+  <div class="cell"><pre class="cod"># As equações normais: XᵀX w = Xᵀy
+Xt  = T(X)
+XtX = matmul(Xt, X)
+Xty = matvec(Xt, ys)
+
+print(&quot;XᵀX =&quot;)
+for linha in XtX:
+    print(&quot;   &quot;, linha)
+print(&quot;Xᵀy =&quot;, Xty)
+
+w = resolve(XtX, Xty)
+print()
+print(&quot;w  =&quot;, [round(v, 6) for v in w])
+print(&quot;reta: y = %.2f + %.2f x&quot; % (w[0], w[1]))</pre></div>
+  <p>Com estes números o sistema é pequeno o bastante para o papel:</p>
+  <div class="eq">
+    5w₀ + 15w₁ = 21<br>
+    15w₀ + 55w₁ = 71<br><br>
+    da primeira: w₀ = (21 − 15w₁)/5<br>
+    substituindo: 3(21 − 15w₁) + 55w₁ = 71 &nbsp;→&nbsp; 63 + 10w₁ = 71 &nbsp;→&nbsp;
+    <b>w₁ = 0,8</b><br>
+    e então w₀ = (21 − 12)/5 = <b>1,8</b>
+  </div>
+</section>
+
+<section id="s4">
+  <div class="aulahead"><p class="n">04</p><h2>O que define a solução</h2></div>
+  <p>Os resíduos não somem — não podem. O que caracteriza a solução de mínimos quadrados é
+  outra coisa: o resíduo é <b>ortogonal a cada coluna</b> de <i>X</i>.</p>
+  <div class="cell"><pre class="cod"># O que define a solução: o resíduo é ortogonal a TODA coluna de X.
+yhat  = matvec(X, w)
+resid = [a - b for a, b in zip(ys, yhat)]
+
+print(&quot;ŷ =&quot;, [round(v, 3) for v in yhat])
+print(&quot;e =&quot;, [round(v, 3) for v in resid])
+print()
+Xte = matvec(T(X), resid)          # = Xᵀe
+print(&quot;Xᵀe =&quot;, [round(v, 12) + 0.0 for v in Xte])
+print()
+print(&quot;A primeira componente é Σe (coluna de 1s).&quot;)
+print(&quot;A segunda é Σe·x (coluna de x).&quot;)
+print(&quot;Uma equação normal por parâmetro — e é isso que &#x27;ortogonal&#x27; quer dizer aqui.&quot;)
+
+sse = sum(e*e for e in resid)
+sst = sum((y - sum(ys)/len(ys))**2 for y in ys)
+print()
+print(&quot;SSE = %.4f   SST = %.4f   R² = %.4f&quot; % (sse, sst, 1 - sse/sst))</pre></div>
+  <div class="box box--obs">
+    <h5>Observe · uma equação normal por parâmetro</h5>
+    <p><i>X</i><sup>T</sup><i>e</i> = 0 não é uma curiosidade: <b>são</b> as equações normais escritas por
+    extenso, uma componente por coluna de <i>X</i>. A primeira, vinda da coluna de 1s, é
+    Σ<i>e</i><sub>i</sub> = 0. A segunda, da coluna de <i>x</i>, é Σ<i>e</i><sub>i</sub><i>x</i><sub>i</sub> = 0.</p>
+    <p>Geometricamente: <i>ŷ</i> é a <b>projeção ortogonal</b> de <i>y</i> sobre o
+    espaço-coluna de <i>X</i>, e o resíduo é o que sobra perpendicular a esse espaço. Mínimos
+    quadrados é um problema de ângulo reto disfarçado.</p>
+  </div>
+</section>
+
+<section id="s5">
+  <div class="aulahead"><p class="n">05</p><h2>Gradiente descendente</h2></div>
+  <p>A forma fechada funciona. A pergunta é até quando: resolver o sistema custa
+  <i>O</i>(<i>d</i>³), e — pior — <i>X</i><sup>T</sup><i>X</i> tem <i>d</i> × <i>d</i> elementos independentemente de
+  quantas observações existam. Com 100 mil atributos isso são 80 GB, e a matriz não chega
+  a ser construída.</p>
+  <p>A alternativa é não resolver ∇<i>J</i> = 0, e sim <b>descer até lá</b>. Com
+  <i>e</i><sub>i</sub> = <i>y</i><sub>i</sub> − <i>w</i><sub>0</sub> − <i>w</i><sub>1</sub><i>x</i><sub>i</sub>:</p>
+  <div class="eq">
+    ∂J/∂w₀ = −(2/n) Σ e<sub>i</sub><br>
+    ∂J/∂w₁ = −(2/n) Σ e<sub>i</sub>x<sub>i</sub><br><br>
+    w ← w − η ∇J(w)
+  </div>
+  <p>Veja de que o gradiente é feito: uma <b>soma ponderada pelos resíduos</b>. Ponto que o
+  modelo já acerta contribui com <i>e</i><sub>i</sub> ≈ 0 e quase não vota; ponto que ele erra
+  feio domina o passo.</p>
+  <div class="cell"><pre class="cod"># Gradiente descendente, implementado à mão.
+def perda(w0, w1):
+    return sum((y - (w0 + w1*x))**2 for x, y in zip(xs, ys)) / len(xs)
+
+def grad(w0, w1):
+    n = len(xs)
+    e = [y - (w0 + w1*x) for x, y in zip(xs, ys)]
+    return (-2/n * sum(e),
+            -2/n * sum(ei*xi for ei, xi in zip(e, xs)))
+
+w0 = w1 = 0.0
+eta = 0.05
+print(&quot; it        w0        w1          J     dJ/dw0     dJ/dw1&quot;)
+for it in range(6):
+    g0, g1 = grad(w0, w1)
+    print(&quot;%3d %9.4f %9.4f %10.4f %10.4f %10.4f&quot; % (it, w0, w1, perda(w0, w1), g0, g1))
+    w0 -= eta*g0
+    w1 -= eta*g1</pre></div>
+  <p>O primeiro passo é enorme — <i>J</i> desaba de 19,4 para 1,48 — e depois o progresso se
+  arrasta. Deixe rodar:</p>
+  <div class="cell"><pre class="cod"># Deixe rodar até convergir e compare com a forma fechada.
+w0 = w1 = 0.0
+for _ in range(5000):
+    g0, g1 = grad(w0, w1)
+    w0 -= eta*g0
+    w1 -= eta*g1
+
+print(&quot;gradiente     :&quot;, [round(w0, 6), round(w1, 6)])
+print(&quot;forma fechada :&quot;, [round(v, 6) for v in w])
+print(&quot;maior diferença: %.2e&quot; % max(abs(w0-w[0]), abs(w1-w[1])))</pre></div>
+  <div class="box box--note">
+    <h5>O mesmo vetor, por dois caminhos</h5>
+    <p>A diferença entre os dois métodos é da ordem de 10<sup>−15</sup>: o épsilon de
+    máquina. Um resolve a equação, o outro caminha até ela — e é o segundo que sobrevive
+    quando <i>d</i> é grande demais para formar <i>X</i><sup>T</sup><i>X</i>, porque ele nunca precisa dessa
+    matriz.</p>
+  </div>
+</section>
+
+<section id="s6">
+  <div class="aulahead"><p class="n">06</p><h2>O passo grande demais</h2></div>
+  <p>Existe um limiar para η. Abaixo dele o método converge; acima, cada passo
+  ultrapassa o mínimo por mais do que a distância que percorreu, e o erro cresce
+  geometricamente.</p>
+  <div class="cell"><pre class="cod"># O limiar da taxa de aprendizado.
+for eta_teste in [0.01, 0.05, 0.10, 0.12, 0.14]:
+    a = b = 0.0
+    estourou = False
+    for _ in range(300):
+        g0, g1 = grad(a, b)
+        a -= eta_teste*g0
+        b -= eta_teste*g1
+        if abs(a) &gt; 1e8 or abs(b) &gt; 1e8:
+            estourou = True
+            break
+    if estourou:
+        print(&quot;eta = %-5s -&gt; DIVERGIU&quot; % eta_teste)
+    else:
+        print(&quot;eta = %-5s -&gt; J = %10.4f   convergiu&quot; % (eta_teste, perda(a, b)))</pre></div>
+  <p>Não há valor universalmente certo de η: o limiar depende da curvatura da
+  perda, que depende da <b>escala dos atributos</b>. Multiplique <code>xs</code> por 100 e
+  rode de novo — o limiar muda. É esse o argumento a favor de padronizar antes de treinar
+  por gradiente, e note que a forma fechada da seção 03 é indiferente a isso.</p>
+</section>
+
+<section id="s7">
+  <div class="aulahead"><p class="n">07</p><h2>Ridge, do zero</h2></div>
+  <p>A regularização L2 acrescenta α·Σ<i>w</i><sub>j</sub>² à perda. Na forma fechada isso
+  vira algo notavelmente simples: <b>somar α à diagonal de <i>X</i><sup>T</sup><i>X</i></b>.</p>
+  <div class="eq">ŵ = (X<sup>T</sup>X + αI)<sup>−1</sup> X<sup>T</sup>y <span class="lbl">sem penalizar o intercepto</span></div>
+  <div class="cell"><pre class="cod"># Ridge do zero: some alfa na diagonal de XᵀX, sem tocar no intercepto.
+def ridge(alfa):
+    A = [linha[:] for linha in XtX]
+    for j in range(1, len(A)):        # começa em 1: o intercepto não é penalizado
+        A[j][j] += alfa
+    return resolve(A, Xty)
+
+print(&quot; alfa        w0        w1&quot;)
+for alfa in [0.0, 0.1, 1.0, 10.0, 100.0, 1000.0]:
+    r = ridge(alfa)
+    print(&quot;%6.1f %9.4f %9.4f&quot; % (alfa, r[0], r[1]))
+
+print()
+print(&quot;A inclinação encolhe em direção a zero, mas nunca chega lá:&quot;)
+print(&quot;dividir por (algo + alfa) não produz zero por maior que alfa seja.&quot;)
+print(&quot;Isso é o L2. O L1 subtrai em vez de dividir — e por isso zera de fato.&quot;)</pre></div>
+  <p>A inclinação encolhe monotonicamente, mas <b>nunca chega a zero</b>. O motivo é
+  aritmético: o L2 divide por algo que cresce com α, e divisão não produz zero
+  exato. O L1 <i>subtrai</i> um valor fixo e corta — por isso ele zera de fato, e por isso
+  só ele seleciona atributos.</p>
+</section>
+
+<section id="s8">
+  <div class="aulahead"><p class="n">08</p><h2>Onde o alfa salva a conta</h2></div>
+  <p>Até aqui o α pareceu um freio opcional. A célula abaixo mostra o caso em que
+  ele é a diferença entre existir e não existir resposta: duas colunas quase idênticas.</p>
+  <div class="cell"><pre class="cod"># Duas colunas quase idênticas: por que o alfa também conserta a numérica.
+xs2 = [1.0, 2.0, 3.0, 4.0]
+X2  = [[1.0, x, x*1.0001] for x in xs2]      # a 3ª coluna é quase cópia da 2ª
+y2  = [1.0, 2.0, 3.0, 4.0]
+X2t = T(X2)
+A2  = matmul(X2t, X2)
+b2  = matvec(X2t, y2)
+
+def ridge_geral(A, b, alfa):
+    M = [linha[:] for linha in A]
+    for j in range(1, len(M)):
+        M[j][j] += alfa
+    return resolve(M, b)
+
+for alfa in [0.0, 1e-6, 1e-3, 1e-1]:
+    try:
+        r = ridge_geral(A2, b2, alfa)
+        print(&quot;alfa = %-8s w = [%9.3f, %9.3f, %9.3f]   soma dos dois últimos = %.4f&quot;
+              % (alfa, r[0], r[1], r[2], r[1] + r[2]))
+    except ValueError as e:
+        print(&quot;alfa = %-8s %s&quot; % (alfa, e))
+
+print()
+print(&quot;Com alfa = 0 não há solução: a matriz é singular e a eliminação para.&quot;)
+print(&quot;Nenhum truque numérico resolve — a informação para separar as duas colunas&quot;)
+print(&quot;simplesmente não está nos dados.&quot;)
+print()
+print(&quot;Basta um alfa minúsculo para existir resposta, e repare qual ela é:&quot;)
+print(&quot;o peso é dividido IGUALMENTE entre as duas colineares, com a soma estável&quot;)
+print(&quot;em torno de 1. Os dados sabem a soma; não sabem a divisão.&quot;)</pre></div>
+  <div class="box box--warn">
+    <h5>Leia com atenção o que aconteceu</h5>
+    <p>Com α = 0 a eliminação <b>para</b>: a matriz é singular. Não é falha
+    numérica que um algoritmo melhor resolveria — a informação para separar as duas
+    colunas não está nos dados.</p>
+    <p>Com α minúsculo existe resposta, e repare qual: o peso é dividido
+    <b>igualmente</b>, com a soma estável. Os dados determinam a soma; não determinam a
+    divisão. O α escolhe a divisão de menor norma, que é a equilibrada.</p>
+    <p>É por isso que Ridge é a resposta padrão à multicolinearidade. O Lasso faria o
+    contrário: escolheria uma coluna e zeraria a outra, de forma quase arbitrária.</p>
+  </div>
+</section>
+
+<section id="quiz">
+  <div class="aulahead"><p class="n">Fixação</p><h2>Oito perguntas</h2></div>
+  <p class="lede">Clique na alternativa que você considera correta. A resposta comentada
+  aparece em seguida — tente responder antes de ler.</p>
+  <div class="quiz">
+<div class="q" data-ans="1"><p class="q__t">Por que não se resolve a regressão como <i>w</i> = <i>X</i><sup>−1</sup><i>y</i>?</p><div class="opt">Porque a inversa é numericamente instável</div><div class="opt">Porque X quase nunca é quadrada e, mesmo quando é o formato certo, o sistema y = Xw normalmente não tem solução exata</div><div class="opt">Porque X⁻¹ existe mas é lenta de calcular</div><div class="opt">Porque y precisa ser padronizado antes</div><div class="exp"><b>Resposta.</b> São duas coisas. X é n×d com n ≫ d, e inversa só existe para matriz quadrada. Mais fundo: com mais equações que incógnitas, y quase nunca está no espaço-coluna de X — nenhum w satisfaz Xw = y. Por isso se busca o ponto mais próximo, e não a igualdade.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 4, Xᵀe deu o vetor nulo. O que isso significa?</p><div class="opt">Que o ajuste foi perfeito e não há erro</div><div class="opt">Que o resíduo é ortogonal a cada coluna de X — uma equação normal por parâmetro</div><div class="opt">Que os dados foram padronizados</div><div class="opt">Que a matriz é singular</div><div class="exp"><b>Resposta.</b> Os resíduos NÃO são zero (e = −0,6; 0,6; 0,8; −1,0; 0,2). O que é zero é a projeção deles sobre cada coluna de X. A primeira componente é Σe, vinda da coluna de 1s; a segunda é Σe·x. Geometricamente: ŷ é a projeção ortogonal de y sobre o espaço-coluna, e o resíduo é o que sobra perpendicular a ele.</div></div>
+<div class="q" data-ans="2"><p class="q__t">Você ajusta sem o intercepto (sem a coluna de 1s). O que acontece com as duas identidades?</p><div class="opt">As duas continuam valendo</div><div class="opt">Σe·x deixa de ser zero, mas Σe continua zero</div><div class="opt">Σe deixa de ser zero, mas Σe·x continua zero</div><div class="opt">As duas deixam de valer</div><div class="exp"><b>Resposta.</b> Cada equação normal vem de derivar em relação a um parâmetro. Sem w₀ não existe ∂J/∂w₀, logo não existe a condição Σe = 0. Sobra a de w₁, que é Σe·x = 0. Na prática o modelo passa a errar sistematicamente para um lado.</div></div>
+<div class="q" data-ans="1"><p class="q__t">O que impede a forma fechada com 100 mil atributos?</p><div class="opt">O tempo: O(d³) levaria dias</div><div class="opt">A memória: XᵀX é d×d, o que dá 80 GB — ela nem chega a ser construída</div><div class="opt">A precisão de ponto flutuante</div><div class="opt">Nada: a forma fechada funciona em qualquer dimensão</div><div class="exp"><b>Resposta.</b> O tempo cresce como d³ e é ruim, mas o que barra antes é o espaço. XᵀX tem d² elementos independentemente de n: com d = 100 000 são 8×10¹⁰ números, 80 GB. O gradiente descendente nunca forma essa matriz — só precisa de Xw e Xᵀe, ambos O(nd).</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 5, por que o primeiro passo é enorme e os seguintes minúsculos?</p><div class="opt">Porque a taxa de aprendizado diminui automaticamente</div><div class="opt">Porque o gradiente é grande quando se está longe do mínimo e encolhe ao chegar perto</div><div class="opt">Porque o algoritmo detecta a convergência</div><div class="opt">Porque os dados foram embaralhados</div><div class="exp"><b>Resposta.</b> O passo é η·∇J, e ∇J é uma soma ponderada pelos resíduos. Partindo de w = 0 os erros são enormes, então o gradiente é enorme. Perto da solução os resíduos se equilibram e o gradiente encolhe. O método desacelera sozinho — e é por isso que J cair rápido no início não diz nada sobre ter convergido.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 7, acima de certo η o método diverge. Por quê?</p><div class="opt">Porque o gradiente passa a ser calculado errado</div><div class="opt">Porque o passo ultrapassa o mínimo por mais do que a distância que percorreu, e o erro cresce a cada iteração</div><div class="opt">Porque acumula erro de arredondamento</div><div class="opt">Porque a perda deixa de ser convexa</div><div class="exp"><b>Resposta.</b> A perda continua convexa e o gradiente continua correto. O problema é o tamanho do passo: se η·∇J for maior que o dobro da distância ao mínimo, você aterrissa mais longe do que estava. Repetindo, isso cresce geometricamente. O limiar depende da curvatura, que depende da escala dos atributos — daí padronizar.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 8, aumentar alfa levou w₁ de 0,80 a 0,0079, mas nunca a zero. Por quê?</p><div class="opt">Porque faltaram iterações</div><div class="opt">Porque o Ridge divide por (algo + alfa), e divisão não produz zero</div><div class="opt">Porque alfa não foi grande o suficiente</div><div class="opt">Porque o intercepto está protegendo w₁</div><div class="exp"><b>Resposta.</b> O L2 encolhe multiplicativamente: por maior que seja alfa, dividir nunca chega a zero exato. O L1 subtrai um valor fixo e corta em zero, então todo coeficiente abaixo do limiar desaparece de fato. É a diferença entre encolher e selecionar.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 9, com alfa = 0 a eliminação parou por matriz singular. Com alfa pequeno, os dois coeficientes colineares ficaram em 0,5 cada. O que isso mostra?</p><div class="opt">Que o alfa corrigiu um erro de programação</div><div class="opt">Que os dados determinam a SOMA dos coeficientes colineares, mas não a divisão entre eles — e o alfa escolhe a divisão equilibrada</div><div class="opt">Que uma das colunas deveria ter sido removida</div><div class="opt">Que o Ridge sempre devolve coeficientes iguais</div><div class="exp"><b>Resposta.</b> Com colunas quase idênticas, mover peso de uma para a outra quase não muda a previsão: a soma é determinada, a divisão não. Sem alfa não existe solução única. O alfa penaliza a soma dos quadrados, que é mínima quando o peso é dividido por igual — daí (0,5; 0,5). O Lasso faria o oposto: escolheria uma e zeraria a outra.</div></div>
+<p id="placar" data-ok="0" data-tot="0">nenhuma respondida ainda</p></div>
+  <a class="top" href="#s0" onclick="return __ir(this)">↑ topo</a>
+</section>
+
+<section id="ref">
+  <div class="aulahead"><p class="n">Fontes</p><h2>Referências</h2></div>
+  <ul>
+    <li><b>Legendre, A.-M.</b> <i>Nouvelles méthodes pour la détermination des orbites des
+    comètes</i>. Courcier, 1805 — os mínimos quadrados, no apêndice.
+    <a href="https://archive.org/details/nouvellesmthode00legegoog" target="_blank">Texto completo</a></li>
+    <li><b>Gauss, C. F.</b> <i>Theoria motus corporum coelestium</i>. Perthes &amp; Besser, 1809.
+    <a href="https://archive.org/details/bub_gb_ORUOAAAAQAAJ" target="_blank">Texto completo</a></li>
+    <li><b>Hoerl, A. E.; Kennard, R. W.</b> "Ridge Regression: Biased Estimation for
+    Nonorthogonal Problems". <i>Technometrics</i> 12, n. 1 (1970): 55–67.
+    <a href="https://doi.org/10.1080/00401706.1970.10488634" target="_blank">DOI</a></li>
+    <li><b>Tibshirani, R.</b> "Regression Shrinkage and Selection via the Lasso".
+    <i>JRSS B</i> 58, n. 1 (1996): 267–288.
+    <a href="https://doi.org/10.1111/j.2517-6161.1996.tb02080.x" target="_blank">DOI</a></li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <div class="col">
+    Insper · Machine Learning · Regressão linear — roteiro para casa.<br>
+    Python roda no navegador via Pyodide (CPython compilado para WebAssembly).<br>
+    Nenhum dado sai da sua máquina; nada é instalado.
+  </div>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* Células de Python executáveis dentro da página, via Pyodide (CPython em WebAssembly).
+   Decisões:
+   - o runtime carrega SOB DEMANDA, no primeiro "rodar": a página abre instantânea;
+   - usa-se só a biblioteca padrão, sem numpy. Num roteiro que implementa regressão
+     do zero isso é uma vantagem: nada fica escondido atrás de uma chamada de matriz,
+     e o download cai de dezenas de MB para poucos;
+   - todas as células compartilham um mesmo namespace, então o que uma define a
+     seguinte enxerga — como num notebook. */
+
+var PY = null, CARREGANDO = null;
+
+function statusGlobal(txt, cor) {
+  var el = document.getElementById('runtime-status');
+  if (!el) return;
+  el.textContent = txt;
+  el.style.color = cor || 'var(--ink-faint)';
+}
+
+function carregaPyodide() {
+  if (PY) return Promise.resolve(PY);
+  if (CARREGANDO) return CARREGANDO;
+  statusGlobal('carregando o Python… (uns 5 s, só na primeira vez)', 'var(--contour)');
+  CARREGANDO = loadPyodide().then(function (py) {
+    PY = py;
+    py.runPython(
+      "import sys, io\n" +
+      "class _Cap(io.StringIO):\n" +
+      "    pass\n"
+    );
+    statusGlobal('Python pronto — as células compartilham o mesmo estado', 'var(--veg)');
+    return py;
+  }).catch(function (e) {
+    statusGlobal('não foi possível carregar o Python: ' + e, 'var(--danger)');
+    throw e;
+  });
+  return CARREGANDO;
+}
+
+function rodaCelula(cel) {
+  var codigo = cel.querySelector('.cod').textContent;
+  var saida = cel.querySelector('.saida');
+  var botao = cel.querySelector('.btn-run');
+  saida.style.display = 'block';
+  saida.className = 'saida';
+  saida.textContent = PY ? 'executando…' : 'preparando o Python…';
+  botao.disabled = true;
+
+  carregaPyodide().then(function (py) {
+    var esc = JSON.stringify(codigo);
+    var wrapper =
+      "import sys, io, traceback\n" +
+      "_b = io.StringIO(); _old = sys.stdout; sys.stdout = _b\n" +
+      "_erro = None\n" +
+      "try:\n" +
+      "    exec(compile(" + esc + ", '<celula>', 'exec'), globals())\n" +
+      "except Exception:\n" +
+      "    _erro = traceback.format_exc(limit=1)\n" +
+      "finally:\n" +
+      "    sys.stdout = _old\n" +
+      "(_b.getvalue(), _erro)";
+    var par = py.runPython(wrapper);
+    var texto = par.get(0), erro = par.get(1);
+    par.destroy && par.destroy();
+    if (erro) {
+      saida.className = 'saida saida--erro';
+      saida.textContent = (texto ? texto + '\n' : '') + erro;
+    } else {
+      saida.textContent = texto && texto.length ? texto : '(sem saída — a célula não imprimiu nada)';
+    }
+  }).catch(function (e) {
+    saida.className = 'saida saida--erro';
+    saida.textContent = 'falhou: ' + e;
+  }).then(function () { botao.disabled = false; });
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+  var cels = document.querySelectorAll('.cell');
+  Array.prototype.forEach.call(cels, function (cel, i) {
+    var barra = document.createElement('div');
+    barra.className = 'cellbar';
+    var b = document.createElement('button');
+    b.className = 'btn btn-run';
+    b.textContent = '▶ rodar';
+    b.addEventListener('click', function () { rodaCelula(cel); });
+    var n = document.createElement('span');
+    n.className = 'cellnum';
+    n.textContent = 'célula ' + (i + 1);
+    barra.appendChild(b); barra.appendChild(n);
+    var pre = cel.querySelector('.cod');
+    cel.insertBefore(barra, pre.nextSibling);
+    var out = document.createElement('pre');
+    out.className = 'saida'; out.style.display = 'none';
+    cel.appendChild(out);
+  });
+
+  /* rodar tudo em ordem */
+  var tudo = document.getElementById('rodar-tudo');
+  if (tudo) tudo.addEventListener('click', function () {
+    var lista = Array.prototype.slice.call(document.querySelectorAll('.cell'));
+    (function proximo(i) {
+      if (i >= lista.length) return;
+      rodaCelula(lista[i]);
+      setTimeout(function () { proximo(i + 1); }, 700);
+    })(0);
+  });
+
+  /* ---------- quiz ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll('.q'), function (q, qi) {
+    var certa = parseInt(q.getAttribute('data-ans'), 10);
+    var opts = q.querySelectorAll('.opt');
+    var fb = document.createElement('div');
+    fb.className = 'fb'; fb.style.display = 'none';
+    fb.innerHTML = q.querySelector('.exp').innerHTML;
+    q.appendChild(fb);
+    q.querySelector('.exp').remove();
+    Array.prototype.forEach.call(opts, function (o, oi) {
+      o.addEventListener('click', function () {
+        if (q.classList.contains('respondida')) return;
+        q.classList.add('respondida');
+        Array.prototype.forEach.call(opts, function (x, xi) {
+          if (xi === certa) x.classList.add('opt--certa');
+          else if (xi === oi) x.classList.add('opt--errada');
+        });
+        fb.style.display = 'block';
+        var p = document.getElementById('placar');
+        if (p) {
+          p.dataset.tot = (parseInt(p.dataset.tot || '0', 10) + 1);
+          if (oi === certa) p.dataset.ok = (parseInt(p.dataset.ok || '0', 10) + 1);
+          p.textContent = p.dataset.ok + ' de ' + p.dataset.tot + ' respondidas corretamente';
+        }
+      });
+    });
+  });
+});
+
+</script>
+</body>
+</html>
