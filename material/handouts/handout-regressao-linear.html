@@ -221,7 +221,7 @@ window.__ir=function(a){
     <a href="#b6"><b>06</b><span>Métricas e o que elas escondem</span></a>
     <a href="#b7"><b>07</b><span>Do exato ao gradiente</span></a>
     <h4>Laboratório</h4>
-    <a href="#L1"><b>L1</b><span>Escrever o OLS</span></a>
+    <a href="#L1"><b>L1</b><span>Mínimos quadrados à mão</span></a>
     <a href="#L2"><b>L2</b><span>Os resíduos somam zero</span></a>
     <a href="#L3"><b>L3</b><span>O ponto que gira a reta</span></a>
     <a href="#L4"><b>L4</b><span>Escrever o gradiente</span></a>
@@ -372,8 +372,10 @@ window.__ir=function(a){
 
 <section id="b3">
   <div class="aulahead"><p class="n">03 — 8 min</p><h2>Por que ao quadrado</h2></div>
-  <p>Falta uma regra para escolher w. Os mínimos quadrados escolhem a reta que minimiza a soma dos
-  resíduos ao quadrado:</p>
+  <p>Falta uma regra para escolher w. Os <b>mínimos quadrados ordinários</b> — <b>OLS</b>, de
+  <i>ordinary least squares</i>, como o método aparece na literatura e nas bibliotecas — escolhem a
+  reta que minimiza a <b>soma dos quadrados dos resíduos</b>, abreviada <b>SSE</b> (<i>sum of
+  squared errors</i>):</p>
   <div class="eq">J(w) = Σ<sub>i</sub> ( y<sub>i</sub> − ŷ<sub>i</sub> )² = ‖ y − Xw ‖²</div>
   <p>Duas escolhas estão embutidas aí e as duas poderiam ter sido outras.</p>
 
@@ -516,7 +518,7 @@ window.__ir=function(a){
         <tr><td><b>MAE</b></td><td><b>M</b>ean <b>A</b>bsolute <b>E</b>rror — erro absoluto médio</td><td>(1/n)Σ|e<sub>i</sub>|</td><td>a mesma de y</td></tr>
         <tr><td><b>MSE</b></td><td><b>M</b>ean <b>S</b>quared <b>E</b>rror — erro quadrático médio</td><td>(1/n)Σe<sub>i</sub>²</td><td>y ao quadrado</td></tr>
         <tr><td><b>RMSE</b></td><td><b>R</b>oot <b>M</b>ean <b>S</b>quared <b>E</b>rror — raiz do erro quadrático médio</td><td>√MSE</td><td>a mesma de y</td></tr>
-        <tr><td><b>R²</b></td><td>coeficiente de determinação</td><td>1 − SQE ⁄ SQT</td><td>nenhuma</td></tr>
+        <tr><td><b>R²</b></td><td>coeficiente de determinação — a fração da soma total de quadrados (<b>SST</b>, <i>total sum of squares</i>) que a reta eliminou</td><td>1 − SSE ⁄ SST</td><td>nenhuma</td></tr>
       </tbody>
     </table>
   </div>
@@ -552,8 +554,8 @@ window.__ir=function(a){
   de demanda o erro total pode ser o que importa (MAE). Escolha <b>antes</b> de ver os resultados.</p>
 
   <h4>O R² compara com o modelo mais preguiçoso possível</h4>
-  <p>A <b>SQT</b> (soma de quadrados total) é o erro de ignorar x e prever sempre ȳ. A <b>SQE</b>
-  (soma de quadrados dos erros) é o que a sua reta ainda erra. O R² é a fração da primeira que a
+  <p>A <b>SST</b> é o erro de ignorar x e
+  prever sempre ȳ. A <b>SSE</b> que você montou no bloco 03 é o que a sua reta ainda erra. O R² é a fração da primeira que a
   segunda eliminou — daí "coeficiente de determinação". Nos cinco pontos, a reta removeu 73% da
   dispersão. E como r = 0,853, note que 0,853² = 0,727: na regressão <i>simples</i> o R² é mesmo a
   correlação ao quadrado — é de onde vem o símbolo e morre quando entra um segundo atributo.</p>

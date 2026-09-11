@@ -240,7 +240,8 @@ window.__ir=function(a){
     <h1>Tudo o que a reta assume,<br><em>e onde cada suposição quebra.</em></h1>
     <p class="deck">O roteiro de aula mostra <b>como</b> ajustar e <b>o que</b> olhar depois. Este
     documento explica <b>por quê</b>: de onde vem a fórmula fechada, o que exatamente a palavra
-    "melhor" garante quando dizemos que o OLS é o melhor estimador e por que quase toda estatística
+    "melhor" garante quando dizemos que o OLS (<i>ordinary least squares</i>, os mínimos quadrados
+    ordinários) é o melhor estimador e por que quase toda estatística
     impressa ao lado de um coeficiente depende de suposições que ninguém verificou.</p>
     <div class="meta">
       <div><span>3</span><small>simuladores</small></div>
@@ -570,7 +571,8 @@ window.__ir=function(a){
     </div>
     <div class="ex">
       <p class="ex__t"><b>3</b>R² nunca cai<span class="tag">papel</span></p>
-      <p>Prove que acrescentar qualquer atributo ao modelo não pode aumentar o SSE de treino — nem
+      <p>Prove que acrescentar qualquer atributo ao modelo não pode aumentar a soma dos quadrados dos
+      erros (SSE) de treino — nem
       se a coluna for ruído puro.</p>
       <details><summary>gabarito</summary><div>
         <p>Argumento geométrico, em uma linha. Adicionar uma coluna aumenta o espaço-coluna de X: o

@@ -322,7 +322,7 @@ window.addEventListener('DOMContentLoaded',function(){
 <section id="s1">
   <div class="aulahead"><p class="n">01</p><h2>As ferramentas</h2></div>
   <p>Quatro funções bastam para o roteiro inteiro: transposta, produto matriz-matriz,
-  produto matriz-vetor, e um solucionador de sistema linear. Este último é eliminação de
+  produto matriz-vetor e um solucionador de sistema linear. Este último é eliminação de
   Gauss com pivotamento parcial — trinta linhas que substituem o
   <code>numpy.linalg.solve</code>.</p>
   <p>Repare em uma decisão: o solucionador <b>detecta singularidade</b> e levanta erro em
@@ -361,7 +361,7 @@ print(&quot;helpers prontos:&quot;, &quot;, &quot;.join([&quot;T&quot;, &quot;ma
 </section>
 
 <section id="s2">
-  <div class="aulahead"><p class="n">02</p><h2>Os dados, e a matriz de projeto</h2></div>
+  <div class="aulahead"><p class="n">02</p><h2>Os dados e a matriz de projeto</h2></div>
   <p>Cinco observações. A coluna de 1s não é enfeite de notação: é o que faz o intercepto
   ser tratado como qualquer outro peso, permitindo escrever o modelo inteiro como
   <i>ŷ</i> = <i>Xw</i>.</p>
@@ -378,11 +378,11 @@ print(&quot;forma de X:&quot;, len(X), &quot;x&quot;, len(X[0]))</pre></div>
   <div class="box box--trap">
     <h5>A armadilha · a tentação de inverter X</h5>
     <p>Olhando <i>ŷ</i> = <i>Xw</i>, o reflexo é <i>w</i> = <i>X</i><sup>−1</sup><i>y</i>. Repare no formato que a
-    célula imprimiu: <b>5 × 2</b>. Não é quadrada, e inversa só existe para matriz
+    célula imprimiu: <b>5 × 2</b>. Não é quadrada e inversa só existe para matriz
     quadrada.</p>
     <p>Mas o obstáculo real é outro: são cinco equações e duas incógnitas. Um <i>w</i> exato
     só existiria se <i>y</i> estivesse no espaço gerado pelas colunas de <i>X</i> — e ele não
-    está. <b>Nenhum <i>w</i> resolve <i>Xw</i> = <i>y</i>.</b> Não é azar: é a situação normal, e é a
+    está. <b>Nenhum <i>w</i> resolve <i>Xw</i> = <i>y</i>.</b> Não é azar: é a situação normal e é a
     razão de a regressão existir.</p>
   </div>
 </section>
@@ -422,8 +422,11 @@ print(&quot;reta: y = %.2f + %.2f x&quot; % (w[0], w[1]))</pre></div>
 
 <section id="s4">
   <div class="aulahead"><p class="n">04</p><h2>O que define a solução</h2></div>
-  <p>Os resíduos não somem — não podem. O que caracteriza a solução de mínimos quadrados é
-  outra coisa: o resíduo é <b>ortogonal a cada coluna</b> de <i>X</i>.</p>
+  <p>Os resíduos não somem — não podem. O que caracteriza a solução de mínimos quadrados
+  ordinários (<b>OLS</b>, de <i>ordinary least squares</i>) é outra coisa: o resíduo é
+  <b>ortogonal a cada coluna</b> de <i>X</i>. A célula abaixo imprime também a <b>SSE</b>
+  (<i>sum of squared errors</i>, a soma dos quadrados dos erros) e a <b>SST</b> (<i>total sum of squares</i>, a soma total de quadrados),
+  que são as duas peças do R².</p>
   <div class="cell"><pre class="cod"># O que define a solução: o resíduo é ortogonal a TODA coluna de X.
 yhat  = matvec(X, w)
 resid = [a - b for a, b in zip(ys, yhat)]
@@ -448,7 +451,7 @@ print(&quot;SSE = %.4f   SST = %.4f   R² = %.4f&quot; % (sse, sst, 1 - sse/sst)
     extenso, uma componente por coluna de <i>X</i>. A primeira, vinda da coluna de 1s, é
     Σ<i>e</i><sub>i</sub> = 0. A segunda, da coluna de <i>x</i>, é Σ<i>e</i><sub>i</sub><i>x</i><sub>i</sub> = 0.</p>
     <p>Geometricamente: <i>ŷ</i> é a <b>projeção ortogonal</b> de <i>y</i> sobre o
-    espaço-coluna de <i>X</i>, e o resíduo é o que sobra perpendicular a esse espaço. Mínimos
+    espaço-coluna de <i>X</i> e o resíduo é o que sobra perpendicular a esse espaço. Mínimos
     quadrados é um problema de ângulo reto disfarçado.</p>
   </div>
 </section>
@@ -456,10 +459,10 @@ print(&quot;SSE = %.4f   SST = %.4f   R² = %.4f&quot; % (sse, sst, 1 - sse/sst)
 <section id="s5">
   <div class="aulahead"><p class="n">05</p><h2>Gradiente descendente</h2></div>
   <p>A forma fechada funciona. A pergunta é até quando: resolver o sistema custa
-  <i>O</i>(<i>d</i>³), e — pior — <i>X</i><sup>T</sup><i>X</i> tem <i>d</i> × <i>d</i> elementos independentemente de
-  quantas observações existam. Com 100 mil atributos isso são 80 GB, e a matriz não chega
+  <i>O</i>(<i>d</i>³) e — pior — <i>X</i><sup>T</sup><i>X</i> tem <i>d</i> × <i>d</i> elementos independentemente de
+  quantas observações existam. Com 100 mil atributos isso são 80 GB e a matriz não chega
   a ser construída.</p>
-  <p>A alternativa é não resolver ∇<i>J</i> = 0, e sim <b>descer até lá</b>. Com
+  <p>A alternativa é não resolver ∇<i>J</i> = 0 e sim <b>descer até lá</b>. Com
   <i>e</i><sub>i</sub> = <i>y</i><sub>i</sub> − <i>w</i><sub>0</sub> − <i>w</i><sub>1</sub><i>x</i><sub>i</sub>:</p>
   <div class="eq">
     ∂J/∂w₀ = −(2/n) Σ e<sub>i</sub><br>
@@ -511,7 +514,7 @@ print(&quot;maior diferença: %.2e&quot; % max(abs(w0-w[0]), abs(w1-w[1])))</pre
 <section id="s6">
   <div class="aulahead"><p class="n">06</p><h2>O passo grande demais</h2></div>
   <p>Existe um limiar para η. Abaixo dele o método converge; acima, cada passo
-  ultrapassa o mínimo por mais do que a distância que percorreu, e o erro cresce
+  ultrapassa o mínimo por mais do que a distância que percorreu e o erro cresce
   geometricamente.</p>
   <div class="cell"><pre class="cod"># O limiar da taxa de aprendizado.
 for eta_teste in [0.01, 0.05, 0.10, 0.12, 0.14]:
@@ -531,7 +534,7 @@ for eta_teste in [0.01, 0.05, 0.10, 0.12, 0.14]:
   <p>Não há valor universalmente certo de η: o limiar depende da curvatura da
   perda, que depende da <b>escala dos atributos</b>. Multiplique <code>xs</code> por 100 e
   rode de novo — o limiar muda. É esse o argumento a favor de padronizar antes de treinar
-  por gradiente, e note que a forma fechada da seção 03 é indiferente a isso.</p>
+  por gradiente e note que a forma fechada da seção 03 é indiferente a isso.</p>
 </section>
 
 <section id="s7">
@@ -556,8 +559,8 @@ print(&quot;A inclinação encolhe em direção a zero, mas nunca chega lá:&quo
 print(&quot;dividir por (algo + alfa) não produz zero por maior que alfa seja.&quot;)
 print(&quot;Isso é o L2. O L1 subtrai em vez de dividir — e por isso zera de fato.&quot;)</pre></div>
   <p>A inclinação encolhe monotonicamente, mas <b>nunca chega a zero</b>. O motivo é
-  aritmético: o L2 divide por algo que cresce com α, e divisão não produz zero
-  exato. O L1 <i>subtrai</i> um valor fixo e corta — por isso ele zera de fato, e por isso
+  aritmético: o L2 divide por algo que cresce com α e divisão não produz zero
+  exato. O L1 <i>subtrai</i> um valor fixo e corta — por isso ele zera de fato e por isso
   só ele seleciona atributos.</p>
 </section>
 
@@ -592,7 +595,7 @@ print(&quot;Com alfa = 0 não há solução: a matriz é singular e a eliminaç�
 print(&quot;Nenhum truque numérico resolve — a informação para separar as duas colunas&quot;)
 print(&quot;simplesmente não está nos dados.&quot;)
 print()
-print(&quot;Basta um alfa minúsculo para existir resposta, e repare qual ela é:&quot;)
+print(&quot;Basta um alfa minúsculo para existir resposta e repare qual ela é:&quot;)
 print(&quot;o peso é dividido IGUALMENTE entre as duas colineares, com a soma estável&quot;)
 print(&quot;em torno de 1. Os dados sabem a soma; não sabem a divisão.&quot;)</pre></div>
   <div class="box box--warn">
@@ -600,7 +603,7 @@ print(&quot;em torno de 1. Os dados sabem a soma; não sabem a divisão.&quot;)<
     <p>Com α = 0 a eliminação <b>para</b>: a matriz é singular. Não é falha
     numérica que um algoritmo melhor resolveria — a informação para separar as duas
     colunas não está nos dados.</p>
-    <p>Com α minúsculo existe resposta, e repare qual: o peso é dividido
+    <p>Com α minúsculo existe resposta e repare qual: o peso é dividido
     <b>igualmente</b>, com a soma estável. Os dados determinam a soma; não determinam a
     divisão. O α escolhe a divisão de menor norma, que é a equilibrada.</p>
     <p>É por isso que Ridge é a resposta padrão à multicolinearidade. O Lasso faria o
@@ -613,13 +616,13 @@ print(&quot;em torno de 1. Os dados sabem a soma; não sabem a divisão.&quot;)<
   <p class="lede">Clique na alternativa que você considera correta. A resposta comentada
   aparece em seguida — tente responder antes de ler.</p>
   <div class="quiz">
-<div class="q" data-ans="1"><p class="q__t">Por que não se resolve a regressão como <i>w</i> = <i>X</i><sup>−1</sup><i>y</i>?</p><div class="opt">Porque a inversa é numericamente instável</div><div class="opt">Porque X quase nunca é quadrada e, mesmo quando é o formato certo, o sistema y = Xw normalmente não tem solução exata</div><div class="opt">Porque X⁻¹ existe mas é lenta de calcular</div><div class="opt">Porque y precisa ser padronizado antes</div><div class="exp"><b>Resposta.</b> São duas coisas. X é n×d com n ≫ d, e inversa só existe para matriz quadrada. Mais fundo: com mais equações que incógnitas, y quase nunca está no espaço-coluna de X — nenhum w satisfaz Xw = y. Por isso se busca o ponto mais próximo, e não a igualdade.</div></div>
-<div class="q" data-ans="1"><p class="q__t">Na célula 4, Xᵀe deu o vetor nulo. O que isso significa?</p><div class="opt">Que o ajuste foi perfeito e não há erro</div><div class="opt">Que o resíduo é ortogonal a cada coluna de X — uma equação normal por parâmetro</div><div class="opt">Que os dados foram padronizados</div><div class="opt">Que a matriz é singular</div><div class="exp"><b>Resposta.</b> Os resíduos NÃO são zero (e = −0,6; 0,6; 0,8; −1,0; 0,2). O que é zero é a projeção deles sobre cada coluna de X. A primeira componente é Σe, vinda da coluna de 1s; a segunda é Σe·x. Geometricamente: ŷ é a projeção ortogonal de y sobre o espaço-coluna, e o resíduo é o que sobra perpendicular a ele.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Por que não se resolve a regressão como <i>w</i> = <i>X</i><sup>−1</sup><i>y</i>?</p><div class="opt">Porque a inversa é numericamente instável</div><div class="opt">Porque X quase nunca é quadrada e, mesmo quando é o formato certo, o sistema y = Xw normalmente não tem solução exata</div><div class="opt">Porque X⁻¹ existe mas é lenta de calcular</div><div class="opt">Porque y precisa ser padronizado antes</div><div class="exp"><b>Resposta.</b> São duas coisas. X é n×d com n ≫ d e inversa só existe para matriz quadrada. Mais fundo: com mais equações que incógnitas, y quase nunca está no espaço-coluna de X — nenhum w satisfaz Xw = y. Por isso se busca o ponto mais próximo e não a igualdade.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 4, Xᵀe deu o vetor nulo. O que isso significa?</p><div class="opt">Que o ajuste foi perfeito e não há erro</div><div class="opt">Que o resíduo é ortogonal a cada coluna de X — uma equação normal por parâmetro</div><div class="opt">Que os dados foram padronizados</div><div class="opt">Que a matriz é singular</div><div class="exp"><b>Resposta.</b> Os resíduos NÃO são zero (e = −0,6; 0,6; 0,8; −1,0; 0,2). O que é zero é a projeção deles sobre cada coluna de X. A primeira componente é Σe, vinda da coluna de 1s; a segunda é Σe·x. Geometricamente: ŷ é a projeção ortogonal de y sobre o espaço-coluna e o resíduo é o que sobra perpendicular a ele.</div></div>
 <div class="q" data-ans="2"><p class="q__t">Você ajusta sem o intercepto (sem a coluna de 1s). O que acontece com as duas identidades?</p><div class="opt">As duas continuam valendo</div><div class="opt">Σe·x deixa de ser zero, mas Σe continua zero</div><div class="opt">Σe deixa de ser zero, mas Σe·x continua zero</div><div class="opt">As duas deixam de valer</div><div class="exp"><b>Resposta.</b> Cada equação normal vem de derivar em relação a um parâmetro. Sem w₀ não existe ∂J/∂w₀, logo não existe a condição Σe = 0. Sobra a de w₁, que é Σe·x = 0. Na prática o modelo passa a errar sistematicamente para um lado.</div></div>
 <div class="q" data-ans="1"><p class="q__t">O que impede a forma fechada com 100 mil atributos?</p><div class="opt">O tempo: O(d³) levaria dias</div><div class="opt">A memória: XᵀX é d×d, o que dá 80 GB — ela nem chega a ser construída</div><div class="opt">A precisão de ponto flutuante</div><div class="opt">Nada: a forma fechada funciona em qualquer dimensão</div><div class="exp"><b>Resposta.</b> O tempo cresce como d³ e é ruim, mas o que barra antes é o espaço. XᵀX tem d² elementos independentemente de n: com d = 100 000 são 8×10¹⁰ números, 80 GB. O gradiente descendente nunca forma essa matriz — só precisa de Xw e Xᵀe, ambos O(nd).</div></div>
-<div class="q" data-ans="1"><p class="q__t">Na célula 5, por que o primeiro passo é enorme e os seguintes minúsculos?</p><div class="opt">Porque a taxa de aprendizado diminui automaticamente</div><div class="opt">Porque o gradiente é grande quando se está longe do mínimo e encolhe ao chegar perto</div><div class="opt">Porque o algoritmo detecta a convergência</div><div class="opt">Porque os dados foram embaralhados</div><div class="exp"><b>Resposta.</b> O passo é η·∇J, e ∇J é uma soma ponderada pelos resíduos. Partindo de w = 0 os erros são enormes, então o gradiente é enorme. Perto da solução os resíduos se equilibram e o gradiente encolhe. O método desacelera sozinho — e é por isso que J cair rápido no início não diz nada sobre ter convergido.</div></div>
-<div class="q" data-ans="1"><p class="q__t">Na célula 7, acima de certo η o método diverge. Por quê?</p><div class="opt">Porque o gradiente passa a ser calculado errado</div><div class="opt">Porque o passo ultrapassa o mínimo por mais do que a distância que percorreu, e o erro cresce a cada iteração</div><div class="opt">Porque acumula erro de arredondamento</div><div class="opt">Porque a perda deixa de ser convexa</div><div class="exp"><b>Resposta.</b> A perda continua convexa e o gradiente continua correto. O problema é o tamanho do passo: se η·∇J for maior que o dobro da distância ao mínimo, você aterrissa mais longe do que estava. Repetindo, isso cresce geometricamente. O limiar depende da curvatura, que depende da escala dos atributos — daí padronizar.</div></div>
-<div class="q" data-ans="1"><p class="q__t">Na célula 8, aumentar alfa levou w₁ de 0,80 a 0,0079, mas nunca a zero. Por quê?</p><div class="opt">Porque faltaram iterações</div><div class="opt">Porque o Ridge divide por (algo + alfa), e divisão não produz zero</div><div class="opt">Porque alfa não foi grande o suficiente</div><div class="opt">Porque o intercepto está protegendo w₁</div><div class="exp"><b>Resposta.</b> O L2 encolhe multiplicativamente: por maior que seja alfa, dividir nunca chega a zero exato. O L1 subtrai um valor fixo e corta em zero, então todo coeficiente abaixo do limiar desaparece de fato. É a diferença entre encolher e selecionar.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 5, por que o primeiro passo é enorme e os seguintes minúsculos?</p><div class="opt">Porque a taxa de aprendizado diminui automaticamente</div><div class="opt">Porque o gradiente é grande quando se está longe do mínimo e encolhe ao chegar perto</div><div class="opt">Porque o algoritmo detecta a convergência</div><div class="opt">Porque os dados foram embaralhados</div><div class="exp"><b>Resposta.</b> O passo é η·∇J e ∇J é uma soma ponderada pelos resíduos. Partindo de w = 0 os erros são enormes, então o gradiente é enorme. Perto da solução os resíduos se equilibram e o gradiente encolhe. O método desacelera sozinho — e é por isso que J cair rápido no início não diz nada sobre ter convergido.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 7, acima de certo η o método diverge. Por quê?</p><div class="opt">Porque o gradiente passa a ser calculado errado</div><div class="opt">Porque o passo ultrapassa o mínimo por mais do que a distância que percorreu e o erro cresce a cada iteração</div><div class="opt">Porque acumula erro de arredondamento</div><div class="opt">Porque a perda deixa de ser convexa</div><div class="exp"><b>Resposta.</b> A perda continua convexa e o gradiente continua correto. O problema é o tamanho do passo: se η·∇J for maior que o dobro da distância ao mínimo, você aterrissa mais longe do que estava. Repetindo, isso cresce geometricamente. O limiar depende da curvatura, que depende da escala dos atributos — daí padronizar.</div></div>
+<div class="q" data-ans="1"><p class="q__t">Na célula 8, aumentar alfa levou w₁ de 0,80 a 0,0079, mas nunca a zero. Por quê?</p><div class="opt">Porque faltaram iterações</div><div class="opt">Porque o Ridge divide por (algo + alfa) e divisão não produz zero</div><div class="opt">Porque alfa não foi grande o suficiente</div><div class="opt">Porque o intercepto está protegendo w₁</div><div class="exp"><b>Resposta.</b> O L2 encolhe multiplicativamente: por maior que seja alfa, dividir nunca chega a zero exato. O L1 subtrai um valor fixo e corta em zero, então todo coeficiente abaixo do limiar desaparece de fato. É a diferença entre encolher e selecionar.</div></div>
 <div class="q" data-ans="1"><p class="q__t">Na célula 9, com alfa = 0 a eliminação parou por matriz singular. Com alfa pequeno, os dois coeficientes colineares ficaram em 0,5 cada. O que isso mostra?</p><div class="opt">Que o alfa corrigiu um erro de programação</div><div class="opt">Que os dados determinam a SOMA dos coeficientes colineares, mas não a divisão entre eles — e o alfa escolhe a divisão equilibrada</div><div class="opt">Que uma das colunas deveria ter sido removida</div><div class="opt">Que o Ridge sempre devolve coeficientes iguais</div><div class="exp"><b>Resposta.</b> Com colunas quase idênticas, mover peso de uma para a outra quase não muda a previsão: a soma é determinada, a divisão não. Sem alfa não existe solução única. O alfa penaliza a soma dos quadrados, que é mínima quando o peso é dividido por igual — daí (0,5; 0,5). O Lasso faria o oposto: escolheria uma e zeraria a outra.</div></div>
 <p id="placar" data-ok="0" data-tot="0">nenhuma respondida ainda</p></div>
   <a class="top" href="#s0" onclick="return __ir(this)">↑ topo</a>
@@ -659,7 +662,7 @@ print(&quot;em torno de 1. Os dados sabem a soma; não sabem a divisão.&quot;)<
    Decisões:
    - o runtime carrega SOB DEMANDA, no primeiro "rodar": a página abre instantânea;
    - usa-se só a biblioteca padrão, sem numpy. Num roteiro que implementa regressão
-     do zero isso é uma vantagem: nada fica escondido atrás de uma chamada de matriz,
+     do zero isso é uma vantagem: nada fica escondido atrás de uma chamada de matriz
      e o download cai de dezenas de MB para poucos;
    - todas as células compartilham um mesmo namespace, então o que uma define a
      seguinte enxerga — como num notebook. */
